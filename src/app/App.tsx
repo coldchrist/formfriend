@@ -69,6 +69,7 @@ import {
   createInitialPuzzleStore,
   getEntryForCell,
   toggleDirectionForRepeatedCellClick,
+  type PuzzleStoreState,
 } from "../state/puzzleStore";
 import "../styles/app.css";
 
@@ -76,9 +77,9 @@ export default function App() {
   const [constructStore, setConstructStore] = useState(() =>
     createInitialPuzzleStore(5),
   );
-  const [solveStore, setSolveStore] = useState(() => ({
+  const [solveStore, setSolveStore] = useState<PuzzleStoreState>(() => ({
     ...createInitialPuzzleStore(5),
-    mode: "solve_strict" as const,
+    mode: "solve_strict" as AppMode,
   }));
   const [activeWorkspace, setActiveWorkspace] = useState<"construct" | "solve">(
     "construct",

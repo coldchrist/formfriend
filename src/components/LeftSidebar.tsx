@@ -5,10 +5,6 @@ import type { ComposedShapeDefinition } from "../domain/shapeDefinition";
 
 type LeftSidebarProps = {
   isDesigner: boolean;
-  currentShapeVariant: ShapeVariant;
-  currentInverted: boolean;
-  currentShapeSupportsInversion: boolean;
-  currentShapeSupportsLeftRight: boolean;
   shapeDisplayName?: string;
   sessionShapeLibrary: ComposedShapeDefinition[];
   selectedLibraryShapeId: string | null;
@@ -28,8 +24,6 @@ type LeftSidebarProps = {
   minimumDesignerPrimitiveSize: number;
   designerGridPresentation: "square" | "hex";
   onInstantiateLibraryShape: (definition: ComposedShapeDefinition) => void;
-  onShapeVariantChange: (shapeVariant: ShapeVariant) => void;
-  onInvertedChange: (inverted: boolean) => void;
   onNewPuzzle: (size: number) => void;
   onSave: () => void;
   onLoad: (file: File) => void | Promise<void>;
@@ -40,20 +34,12 @@ type LeftSidebarProps = {
     ) => LeftSidebarProps["designerState"],
   ) => void;
   onDesignerGridPresentationChange: (value: "square" | "hex") => void;
-  onUseDesignedShape: () => void;
-  onSaveDesignedShape: () => void;
-  onClearDesignedGrid: () => void;
-  onLoadDesignedShape: (file: File) => void | Promise<void>;
   // unused in non-designer but kept for AppMode awareness
   storeMode: AppMode;
 };
 
 export function LeftSidebar({
   isDesigner,
-  currentShapeVariant,
-  currentInverted,
-  currentShapeSupportsInversion,
-  currentShapeSupportsLeftRight,
   shapeDisplayName,
   sessionShapeLibrary,
   selectedLibraryShapeId,
@@ -64,18 +50,12 @@ export function LeftSidebar({
   minimumDesignerPrimitiveSize,
   designerGridPresentation,
   onInstantiateLibraryShape,
-  onShapeVariantChange,
-  onInvertedChange,
   onNewPuzzle,
   onSave,
   onLoad,
   onBrowseLibrary,
   onDesignerStateChange,
   onDesignerGridPresentationChange,
-  onUseDesignedShape,
-  onSaveDesignedShape,
-  onClearDesignedGrid,
-  onLoadDesignedShape,
 }: LeftSidebarProps) {
   return (
     <aside className="left-panel">

@@ -1647,7 +1647,6 @@ export const PUZZLE_LIBRARY: SavedPuzzle[] = [
         FW_SINGLE_9: "_____",
       },
     },
-    solveMode: "checkable",
     obfuscatedSolution:
       "XSIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiWw==",
     gridPresentation: "square",

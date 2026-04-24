@@ -72,18 +72,32 @@ export function SavePuzzleDialog({
         <h3>Save Form</h3>
 
         <div className="save-puzzle-fields">
-          <label>
-            Save as
-            <select
-              value={includeSolution ? "checkable" : "strict"}
-              onChange={(e) =>
-                onIncludeSolutionChange(e.target.value === "checkable")
-              }
+          <div>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                cursor: "pointer",
+              }}
             >
-              <option value="strict">Strict</option>
-              <option value="checkable">Checkable</option>
-            </select>
-          </label>
+              <input
+                type="checkbox"
+                checked={includeSolution}
+                onChange={(e) => onIncludeSolutionChange(e.target.checked)}
+              />
+              <span style={{ fontWeight: 500 }}>Include solution</span>
+            </label>
+            <p
+              style={{
+                margin: "4px 0 0 24px",
+                fontSize: "0.8rem",
+                color: "#64748b",
+              }}
+            >
+              Allows users to check their solution in Solve mode
+            </p>
+          </div>
 
           <label>
             Filename

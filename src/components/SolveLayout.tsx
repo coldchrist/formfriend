@@ -122,7 +122,6 @@ export function SolveLayout({
   onEntryKeyDown,
 }: SolveLayoutProps) {
   const metadataLine = buildMetadataLine(
-    title,
     author,
     publication,
     enigmaIssue,

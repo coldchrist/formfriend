@@ -1,4 +1,4 @@
-import type { SavedPuzzle, SolutionState, SolveMode } from "../domain/types";
+import type { SavedPuzzle, SolutionState } from "../domain/types";
 import type { FormModel } from "../domain/formModel";
 import { getMappingsForCell } from "../domain/formModel";
 
@@ -7,7 +7,6 @@ type PuzzleFileBuildInput = {
   topology: SavedPuzzle["topology"];
   content: SavedPuzzle["content"];
   state: SavedPuzzle["state"];
-  solveMode: SolveMode;
   solution?: SolutionState;
   formModel: FormModel;
   gridPresentation: "square" | "hex";
@@ -61,7 +60,6 @@ export function buildPuzzleFile(input: PuzzleFileBuildInput): SavedPuzzle {
     topology: input.topology,
     content: input.content,
     state: input.state,
-    solveMode: hasSolution ? "checkable" : "strict",
     obfuscatedSolution: input.solution
       ? obfuscateSolutionGrid(
           buildSolutionGrid(input.solution, input.topology, input.formModel),

@@ -234,13 +234,15 @@ export function useAppFileActions({
       saveDialogFilename.trim() || store.content.metadata.title.trim();
     downloadPuzzleFile(puzzle, usedFilename || undefined);
     setSaveDialogFilename(usedFilename);
-    setIsDirty(false);
+    if (includeSolution) {
+      setIsDirty(false);
+    }
     setUiStatus("Form saved.", "success");
     setSaveDialogKind(null);
   }
 
   function handleSave() {
-    openSaveDialog("save");
+    openSaveDialog("solver");
   }
 
   function handleExportSolverVersion() {
