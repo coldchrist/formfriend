@@ -1,0 +1,383 @@
+:root {
+  font-family: Arial, sans-serif;
+  color: #222;
+  background: #f7f7f7;
+}
+
+body {
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #ccc;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.app-main > .left-panel,
+.app-main > .center-panel,
+.app-main > .right-panel {
+  margin: 0 8px;
+}
+
+/* Left panel fixed */
+.left-panel {
+  width: 260px;
+  flex-shrink: 0;
+}
+
+/* Right panel fixed */
+.right-panel {
+  width: 320px;
+  flex-shrink: 0;
+}
+
+/* Center panel = content-sized */
+.center-panel {
+  width: fit-content;
+  min-width: 420px; /* adjust to taste */
+  max-width: 100%;
+}
+
+.left-panel,
+.center-panel,
+.right-panel {
+  background: white;
+  border: 1px solid #ccc;
+  padding: 16px;
+}
+
+.left-panel,
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.center-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 12px;
+}
+
+.metadata-panel,
+.clue-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.clue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.clue-row {
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.clue-row.active {
+  background: #eef6ff;
+}
+
+.clue-row label,
+.metadata-panel label,
+.toolbar-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.clue-label {
+  font-weight: 700;
+}
+
+input[type="text"],
+select,
+button {
+  padding: 8px;
+  font-size: 14px;
+}
+
+input[type="file"] {
+  font-size: 13px;
+}
+
+fieldset {
+  border: 1px solid #ccc;
+  padding: 8px;
+}
+
+.mode-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.radio-option input[type="radio"] {
+  margin: 0;
+}
+
+.toolbar-panel .radio-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-panel .radio-option span {
+  display: inline;
+}
+
+.toolbar-panel .checkbox-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-panel > div {
+  font-size: 14px;
+  color: #444;
+}
+
+.toolbar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toolbar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.toolbar-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toolbar-section-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.toolbar-status {
+  font-size: 14px;
+  color: #444;
+  overflow-wrap: anywhere;
+}
+
+.toolbar-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.toolbar-toggle {
+  align-self: flex-start;
+}
+
+.toolbar-status-message,
+.header-status-message {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  border: 1px solid #d9d9d9;
+}
+
+.toolbar-status-info,
+.header-status-info {
+  background: #f4f4f4;
+  color: #333;
+}
+
+.toolbar-status-success,
+.header-status-success {
+  background: #eef8ee;
+  color: #1f5f1f;
+  border-color: #b7ddb7;
+}
+
+.toolbar-status-error,
+.header-status-error {
+  background: #fff1f1;
+  color: #8a1f1f;
+  border-color: #e2b8b8;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 35%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
+.word-lookup-dialog {
+  width: min(420px, 100%);
+  background: white;
+  border: 1px solid #ccc;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.word-lookup-dialog h3 {
+  margin: 0;
+}
+
+.word-lookup-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.word-lookup-list {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.word-lookup-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.save-puzzle-dialog {
+  width: min(460px, 100%);
+  background: white;
+  border: 1px solid #ccc;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.save-puzzle-dialog h3 {
+  margin: 0;
+}
+
+.save-puzzle-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.save-puzzle-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.save-puzzle-dialog textarea {
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.save-puzzle-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.clue-panel h3 {
+  margin: 0;
+}
+
+.clue-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.35;
+  resize: none;
+  overflow: hidden;
+}
+
+.clue-list {
+  scroll-behavior: smooth;
+}
+
+.puzzle-grid {
+  max-width: 100%;
+  height: auto;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.center-title {
+  text-align: center;
+  margin: 0 0 8px 0;
+}
+
+.grid-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
