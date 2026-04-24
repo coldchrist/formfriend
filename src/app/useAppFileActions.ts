@@ -95,12 +95,19 @@ function tryDecodeSolutionGrid(
     return undefined;
   }
 }
-
 function solutionGridToState(
   grid: string[],
   topology: SavedPuzzle["topology"],
   loadedFormModel: FormModel,
 ): SolutionState {
+  console.log(
+    "[solutionGridToState] formWords:",
+    loadedFormModel.formWords.map((fw) => fw.id),
+  );
+  console.log(
+    "[solutionGridToState] mappings sample:",
+    loadedFormModel.mappings.slice(0, 3),
+  );
   // Start with empty fills
   const fillsByFormWordId: Record<string, string> = {};
   for (const formWord of loadedFormModel.formWords) {
@@ -213,7 +220,19 @@ export function useAppFileActions({
     setCurrentPuzzleComment(metadata.comment);
     setCurrentPuzzleEnigmaIssue(metadata.enigmaIssue);
     setCurrentPuzzleFormNumber(metadata.formNumber);
-
+    console.log("[SAVE TEST] includeSolution:", includeSolution);
+    console.log(
+      "[SAVE TEST] store.state first values:",
+      Object.values(store.state.fillsByFormWordId).slice(0, 5),
+    );
+    console.log(
+      "[SAVE TEST] store.solution first values:",
+      Object.values(store.solution?.fillsByFormWordId ?? {}).slice(0, 5),
+    );
+    console.log(
+      "[SAVE TEST] saving source is:",
+      includeSolution ? "store.state" : "none",
+    );
     const puzzle = buildPuzzleFile({
       spec: store.spec,
       topology: store.topology,
@@ -283,7 +302,10 @@ export function useAppFileActions({
           spec: puzzle.spec,
           topology: puzzle.topology,
           content: puzzle.content,
-          state: buildEmptyFormFillState(loadedFormModel),
+          state:
+            !isSolve && solution
+              ? solution
+              : buildEmptyFormFillState(loadedFormModel),
           solution,
           selection: {
             cellId: puzzle.topology.cells[0]?.id ?? null,
@@ -314,12 +336,23 @@ export function useAppFileActions({
   }
 
   function loadPuzzleFromLibrary(puzzle: SavedPuzzle) {
+    console.log(
+      "[library load] CALLED, isSolve:",
+      isSolve,
+      "stack:",
+      new Error().stack?.split("\n").slice(1, 3).join(" | "),
+    );
     if (!confirmDiscardChanges("load a library form")) {
       return;
     }
 
     const solutionGrid = tryDecodeSolutionGrid(puzzle.obfuscatedSolution);
-
+    console.log("[library load] isSolve:", isSolve);
+    console.log("[library load] solutionGrid:", solutionGrid);
+    console.log(
+      "[library load] obfuscatedSolution:",
+      puzzle.obfuscatedSolution?.slice(0, 20),
+    );
     setStore(() => {
       const loadedMode: AppMode = isSolve
         ? solutionGrid != null
@@ -335,13 +368,17 @@ export function useAppFileActions({
       const solution = solutionGrid
         ? solutionGridToState(solutionGrid, puzzle.topology, loadedFormModel)
         : undefined;
-
+      console.log("[library load] loadedMode:", loadedMode);
+      console.log("[library load] solution:", solution);
       return {
         mode: loadedMode,
         spec: puzzle.spec,
         topology: puzzle.topology,
         content: puzzle.content,
-        state: buildEmptyFormFillState(loadedFormModel),
+        state:
+          !isSolve && solution
+            ? solution
+            : buildEmptyFormFillState(loadedFormModel),
         solution,
         selection: {
           cellId: puzzle.topology.cells[0]?.id ?? null,
@@ -349,7 +386,7 @@ export function useAppFileActions({
         },
       };
     });
-
+    console.log("[library load] setActiveWorkspace called, isSolve:", isSolve);
     setCurrentPuzzleDateAdded(puzzle.dateAdded ?? getTodayString());
     setCurrentPuzzleComment(puzzle.comment ?? "");
     setCurrentPuzzleEnigmaIssue(puzzle.enigmaIssue ?? "");

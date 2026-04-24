@@ -11,6 +11,7 @@ type SolveToolbarProps = {
   onLoad: (file: File) => void;
   onBrowseLibrary: () => void;
   onModeChange: (mode: AppMode) => void;
+  onConstructFromForm: () => void;
 };
 
 type ToolbarButtonProps = {
@@ -66,7 +67,16 @@ export function SolveToolbar({
   onLoad,
   onBrowseLibrary,
   onModeChange,
+  onConstructFromForm,
 }: SolveToolbarProps) {
+  console.log("[CHECK BUTTON TEST SolveToolbar]", {
+    isSolveCheckable,
+    hasSolution,
+    isSolutionCorrect,
+    hasOnCheck: typeof onCheck === "function",
+    loadedPuzzleFileName,
+  });
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   return (
@@ -85,18 +95,6 @@ export function SolveToolbar({
         }}
       />
 
-      {isSolveCheckable ? (
-        <ToolbarButton
-          icon="✓"
-          label="Check"
-          shortcut="Ctrl+Enter"
-          onClick={onCheck}
-          disabled={!hasSolution || isSolutionCorrect}
-          variant="primary"
-          title="Check your solution"
-        />
-      ) : null}
-
       <ToolbarButton
         icon="⌫"
         label="Clear"
@@ -104,6 +102,17 @@ export function SolveToolbar({
         onClick={onClearGrid}
         title="Clear the working grid"
       />
+
+      {isSolveCheckable && hasSolution ? (
+        <ToolbarButton
+          icon="✓"
+          label={isSolutionCorrect ? "Correct" : "Check"}
+          shortcut="Ctrl+Enter"
+          onClick={onCheck}
+          variant="primary"
+          title="Check your current fill against the solution"
+        />
+      ) : null}
 
       <div className="solve-toolbar-separator" aria-hidden="true" />
 
@@ -130,7 +139,7 @@ export function SolveToolbar({
       <ToolbarButton
         icon="✏"
         label="Construct"
-        onClick={() => onModeChange("construct")}
+        onClick={onConstructFromForm}
         variant="secondary"
         title="Switch to Construct mode for this form"
       />

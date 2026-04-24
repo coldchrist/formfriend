@@ -1648,7 +1648,7 @@ export const PUZZLE_LIBRARY: SavedPuzzle[] = [
       },
     },
     obfuscatedSolution:
-      "XSIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiLCIgICAgICAgICAiWw==",
+      "XSJSQUdERSAgICAiLCJBVE5JVSAgICAiLCJHTklPRyAgICAiLCJESU9WTyAgICAiLCJFVUdPR0FNRUQiLCIgICAgQVNBSEwiLCIgICAgTUFDQ08iLCIgICAgRUhDQUMiLCIgICAgRExPQ1MiWw==",
     gridPresentation: "square",
     dateAdded: "2026-04-24",
     enigmaIssue: "1998-08",
@@ -2094,9 +2094,10 @@ export const PUZZLE_LIBRARY: SavedPuzzle[] = [
       },
     },
     obfuscatedSolution:
-      "XSIgICAgICAgICAgICIsIiAgICAgICAgICAgIiwiICAgICAgICAgICAiLCIgICAgICAgICAgICIsIiAgICAgICAgICAgIiwiICAgICAgICAgICAiWw==",
+      "XSJFTExFRE5BQ0lSRiIsIiBTQVJFQU1JSEMgIiwiICBNT1ROQUhQICAiLCIgICBUQUVMQyAgICIsIiAgICBNRUwgICAgIiwiICAgICBLICAgICAiWw==",
     gridPresentation: "square",
     dateAdded: "2026-04-24",
+    comment: "test",
     enigmaIssue: "1998-08",
     formNumber: "F-1",
   },

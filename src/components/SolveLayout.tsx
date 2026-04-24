@@ -53,6 +53,7 @@ type SolveLayoutProps = {
     event: React.KeyboardEvent<HTMLTextAreaElement>,
     entryId: string,
   ) => void;
+  onConstructFromForm: () => void;
 };
 
 function buildMetadataLine(
@@ -118,9 +119,17 @@ export function SolveLayout({
   onLoad,
   onBrowseLibrary,
   onModeChange,
+  onConstructFromForm,
   onEntryClick,
   onEntryKeyDown,
 }: SolveLayoutProps) {
+  console.log("[CHECK BUTTON TEST SolveLayout]", {
+    isSolveCheckable,
+    hasSolution,
+    title,
+    loadedPuzzleFileName,
+  });
+
   const metadataLine = buildMetadataLine(
     author,
     publication,
@@ -169,6 +178,7 @@ export function SolveLayout({
           onLoad={onLoad}
           onBrowseLibrary={onBrowseLibrary}
           onModeChange={onModeChange}
+          onConstructFromForm={onConstructFromForm}
         />
       </div>
 

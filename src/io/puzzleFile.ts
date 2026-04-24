@@ -53,7 +53,17 @@ export function buildSolutionGrid(
 
 export function buildPuzzleFile(input: PuzzleFileBuildInput): SavedPuzzle {
   const hasSolution = Boolean(input.solution);
-
+  console.log("[BUILD FILE TEST] hasSolution:", hasSolution);
+  console.log(
+    "[BUILD FILE TEST] solution first values:",
+    Object.values(input.solution?.fillsByFormWordId ?? {}).slice(0, 5),
+  );
+  console.log(
+    "[BUILD FILE TEST] solutionGrid:",
+    input.solution
+      ? buildSolutionGrid(input.solution, input.topology, input.formModel)
+      : undefined,
+  );
   return {
     version: 2,
     spec: input.spec,

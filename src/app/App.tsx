@@ -147,6 +147,16 @@ export default function App() {
   const isSolve = activeWorkspace === "solve";
   const isSolveStrict = isSolve && solveStore.mode === "solve_strict";
   const isSolveCheckable = isSolve && solveStore.mode === "solve_checkable";
+  console.log(
+    "[render] isSolve:",
+    isSolve,
+    "solveStore.mode:",
+    solveStore.mode,
+    "isSolveCheckable:",
+    isSolveCheckable,
+    "solveStore.solution:",
+    solveStore.solution,
+  );
 
   const isDirty = isSolve ? isSolveDirty : isConstructDirty;
   const setIsDirty = isSolve ? setIsSolveDirty : setIsConstructDirty;
@@ -677,21 +687,79 @@ export default function App() {
   }
 
   function handleConstructFromLoadedForm() {
-    setStore((prev) => ({
-      ...prev,
+    console.log(
+      "[construct from form] solveStore.solution:",
+      solveStore.solution,
+    );
+    console.log(
+      "[construct from form] showSolution will be asked:",
+      Boolean(solveStore.solution),
+    );
+    const hasSolution = Boolean(solveStore.solution);
+    let showSolution = false;
+
+    if (hasSolution) {
+      showSolution = window.confirm(
+        "This form has a solution. Opening it in Construct mode will reveal the answers. Continue?",
+      );
+    }
+
+    const loadedFormModel = buildFormModelFromTopology(
+      solveStore.spec,
+      solveStore.topology,
+    );
+    console.log("[construct from form] showSolution:", showSolution);
+    console.log(
+      "[construct from form] state being set:",
+      showSolution && solveStore.solution ? "SOLUTION" : "EMPTY",
+    );
+    const firstKey = Object.keys(
+      solveStore.solution?.fillsByFormWordId ?? {},
+    )[0];
+    const constructFirstKey = buildFormModelFromTopology(
+      solveStore.spec,
+      solveStore.topology,
+    ).formWords[0]?.id;
+    console.log(
+      "[construct from form] solution key sample:",
+      firstKey,
+      "construct formWord key:",
+      constructFirstKey,
+    );
+    const solutionKeys = Object.keys(
+      solveStore.solution?.fillsByFormWordId ?? {},
+    );
+    const solutionValues = Object.values(
+      solveStore.solution?.fillsByFormWordId ?? {},
+    );
+    console.log(
+      "[construct from form] solution keys:",
+      solutionKeys.slice(0, 3),
+    );
+    console.log(
+      "[construct from form] solution values:",
+      solutionValues.slice(0, 3),
+    );
+    setConstructStore({
       mode: "construct",
-      state: buildEmptyFormFillState(
-        buildFormModelFromTopology(prev.spec, prev.topology),
-      ),
+      spec: solveStore.spec,
+      topology: solveStore.topology,
+      content: solveStore.content,
+      state:
+        showSolution && solveStore.solution
+          ? solveStore.solution
+          : buildEmptyFormFillState(loadedFormModel),
+      solution: undefined,
       selection: {
-        cellId: prev.topology.cells[0]?.id ?? null,
+        cellId: solveStore.topology.cells[0]?.id ?? null,
         direction: "across",
       },
-    }));
+    });
 
+    setActiveWorkspace("construct");
     setIncorrectCellIds(new Set());
     setIsSolutionCorrect(false);
-    setIsDirty(false);
+    setIsConstructDirty(false);
     setUiStatus("Switched to construct mode for this form.", "success");
   }
 
@@ -1177,6 +1245,16 @@ export default function App() {
 
   // Solve mode gets its own full-width two-panel layout
   if (isSolve) {
+    console.log("[CHECK BUTTON TEST App]", {
+      isSolve,
+      storeMode: store.mode,
+      solveStoreMode: solveStore.mode,
+      isSolveCheckable,
+      hasStoreSolution: Boolean(store.solution),
+      hasSolveStoreSolution: Boolean(solveStore.solution),
+      title: store.content.metadata.title,
+    });
+
     return (
       <div className="app-shell">
         <AppHeader
@@ -1244,6 +1322,7 @@ export default function App() {
             onModeChange={handleModeChange}
             onEntryClick={handleEntryClick}
             onEntryKeyDown={handleClueInputKeyDown}
+            onConstructFromForm={handleConstructFromLoadedForm}
           />
         </main>
 
