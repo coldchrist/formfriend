@@ -38,6 +38,7 @@ import type {
   ShapePrimitive,
 } from "../domain/shapeDefinition";
 import { isTopologyReflectableAcrossLeadingDiagonal } from "../domain/squareTopology";
+import { parseWordListText } from "../domain/wordList";
 import type { LoadedWordList } from "../domain/wordList";
 import {
   buildCellFillsFromFormFillState,
@@ -352,6 +353,19 @@ export default function App() {
     isAutofillRunning ||
     autofillStatusText.startsWith("Autofill running") ||
     autofillStatusText.startsWith("Stopping autofill");
+
+  useEffect(() => {
+    fetch("/wordlist.enriched.tsv")
+      .then((res) => res.text())
+      .then((text) => {
+        const parsed = parseWordListText(text, "wordlist.enriched.tsv");
+        setLoadedWordList(parsed);
+        setLoadedWordListName("wordlist.enriched.tsv");
+      })
+      .catch(() => {
+        // Silent fail — user can still load their own word list manually
+      });
+  }, []);
 
   useEffect(() => {
     function handleBeforeUnload(event: BeforeUnloadEvent) {
