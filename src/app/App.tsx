@@ -86,7 +86,8 @@ export default function App() {
     "construct",
   );
   const gridRef = useRef<PuzzleGridHandle | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
+  const [isConstructDirty, setIsConstructDirty] = useState(false);
+  const [isSolveDirty, setIsSolveDirty] = useState(false);
   const [loadedWordList, setLoadedWordList] = useState<LoadedWordList | null>(
     null,
   );
@@ -146,6 +147,9 @@ export default function App() {
   const isSolve = activeWorkspace === "solve";
   const isSolveStrict = isSolve && solveStore.mode === "solve_strict";
   const isSolveCheckable = isSolve && solveStore.mode === "solve_checkable";
+
+  const isDirty = isSolve ? isSolveDirty : isConstructDirty;
+  const setIsDirty = isSolve ? setIsSolveDirty : setIsConstructDirty;
 
   const store = isSolve ? solveStore : constructStore;
   const setStore = isSolve ? setSolveStore : setConstructStore;
