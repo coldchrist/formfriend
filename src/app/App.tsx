@@ -1079,8 +1079,7 @@ export default function App() {
     setSaveDialogFormNumber,
     saveDialogFilename,
     setSaveDialogFilename,
-
-    isWordLookupOpen,
+    setIsWordLookupOpen,
     wordLookupOffset,
     setWordLookupOffset,
     setWordLookupMatches,
@@ -1258,10 +1257,6 @@ export default function App() {
           isDesigner={isDesigner}
           storeMode={store.mode}
           currentSize={store.spec.size}
-          currentShapeVariant={currentShapeVariant}
-          currentInverted={currentInverted}
-          currentShapeSupportsInversion={currentShapeSupportsInversion}
-          currentShapeSupportsLeftRight={currentShapeSupportsLeftRight}
           shapeDisplayName={store.spec.shapeName}
           sessionShapeLibrary={sessionShapeLibrary}
           selectedLibraryShapeId={selectedLibraryShapeId}
@@ -1286,10 +1281,6 @@ export default function App() {
           onBrowseLibrary={() => setIsLibraryOpen(true)}
           onDesignerStateChange={updateDesignerSidebarState}
           onDesignerGridPresentationChange={setDesignerGridPresentation}
-          onUseDesignedShape={handleUseDesignedShape}
-          onSaveDesignedShape={handleSaveDesignedShape}
-          onClearDesignedGrid={handleClearDesignedGrid}
-          onLoadDesignedShape={handleLoadDesignedShape}
         />
 
         <section
