@@ -95,9 +95,9 @@ const STANDARD_SHAPES: ComposedShapeDefinition[] = [
     id: "oblong",
     name: "Oblong",
     layout: {
-      width: 4,
+      width: 3,
       height: 3,
-      rows: ["rl.", "RSl", ".RL."],
+      rows: ["rl.", "RSl", ".RL"],
       overlapRows: 1,
       overlapCols: 1,
     },
