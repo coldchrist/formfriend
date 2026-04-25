@@ -1,6 +1,7 @@
 import { isTopologyReflectableAcrossLeadingDiagonal } from "../domain/squareTopology";
 import { parseSerializedLayout } from "../domain/shapeLayout";
 import { supportsLeftRightVariant } from "../domain/shapeTransforms";
+import type { ComposedShapeDefinition } from "../domain/shapeDefinition";
 import type { FormStyle, SavedPuzzle, ShapeVariant } from "../domain/types";
 
 function getFormTypeTitle(
@@ -270,6 +271,90 @@ export function PuzzleLibraryDialog({
                 </div>
               );
             })}
+        </div>
+
+        <div className="save-puzzle-buttons">
+          <button type="button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ShapeLibraryDialogProps = {
+  shapes: ComposedShapeDefinition[];
+  onLoadShape: (shape: ComposedShapeDefinition) => void;
+  onClose: () => void;
+};
+
+export function ShapeLibraryDialog({
+  shapes,
+  onLoadShape,
+  onClose,
+}: ShapeLibraryDialogProps) {
+  return (
+    <div className="dialog-backdrop">
+      <div className="save-puzzle-dialog">
+        <h3>Start from Shape</h3>
+
+        <div
+          className="save-puzzle-fields"
+          style={{ maxHeight: "350px", overflowY: "auto" }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 1fr 1fr 1fr",
+              fontWeight: 600,
+              borderBottom: "1px solid #ccc",
+              paddingBottom: "4px",
+              marginBottom: "6px",
+              fontSize: "0.85rem",
+            }}
+          >
+            <div>Name</div>
+            <div>Grid</div>
+            <div>Size</div>
+            <div>Overlap</div>
+          </div>
+
+          {[...shapes]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((shape) => (
+              <div
+                key={shape.id}
+                onClick={() => onLoadShape(shape)}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 1fr 1fr 1fr",
+                  padding: "4px 0",
+                  borderBottom: "1px solid #eee",
+                  fontSize: "0.85rem",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#f1f5f9")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+              >
+                <div>{shape.name}</div>
+                <div>
+                  {shape.renderHints?.gridPresentation === "hex"
+                    ? "Hex"
+                    : "Square"}
+                </div>
+                <div>
+                  {shape.layout.width} × {shape.layout.height}
+                </div>
+                <div>
+                  {shape.layout.overlapRows} / {shape.layout.overlapCols}
+                </div>
+              </div>
+            ))}
         </div>
 
         <div className="save-puzzle-buttons">

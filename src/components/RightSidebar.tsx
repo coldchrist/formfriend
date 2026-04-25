@@ -20,7 +20,9 @@ type RightSidebarProps = {
   ) => void;
   onClueChange: (entryId: string, text: string) => void;
   // Designer actions (only used when isDesigner)
+  // Designer actions (only used when isDesigner)
   onConstruct: () => void;
+  onStartFromShape: () => void;
   onSaveShape: () => void;
   onClearDesignedGrid: () => void;
   onLoadDesignedShape: (file: File) => void | Promise<void>;
@@ -41,6 +43,7 @@ export function RightSidebar({
   onEntryKeyDown,
   onClueChange,
   onConstruct,
+  onStartFromShape,
   onSaveShape,
   onClearDesignedGrid,
   onLoadDesignedShape,
@@ -60,6 +63,7 @@ export function RightSidebar({
         <DesignerNotesPanel
           layoutRowsText={shapeDesignerLayoutRowsText}
           onConstruct={onConstruct}
+          onStartFromShape={onStartFromShape}
           onSaveShape={onSaveShape}
           onClearGrid={onClearDesignedGrid}
           onLoadShape={onLoadDesignedShape}

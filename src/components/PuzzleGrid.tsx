@@ -105,6 +105,52 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
     const width = PADDING * 2 + (maxCol - minCol + 1) * cellSize + LABEL_SPACE;
     const height = PADDING * 2 + (maxRow + 1) * cellSize + LABEL_SPACE;
 
+    function getCellX(cell: (typeof topology.cells)[number]): number {
+      const rowMetrics = rowMetricsByRow.get(cell.row);
+
+      return isHex && rowMetrics
+        ? PADDING +
+            LABEL_SPACE +
+            rowMetrics.offset +
+            (cell.col - rowMetrics.minCol) * cellSize
+        : PADDING + LABEL_SPACE + (cell.col - minCol) * cellSize;
+    }
+
+    const cellXById = new Map(
+      topology.cells.map((cell) => [cell.id, getCellX(cell)]),
+    );
+
+    const hexDownLabelSide: "left" | "right" | "center" = (() => {
+      if (!isHex) {
+        return "center";
+      }
+
+      const firstMultiCellDownEntry = topology.entries.find(
+        (entry) => entry.direction === "down" && entry.cells.length > 1,
+      );
+
+      if (!firstMultiCellDownEntry) {
+        return "center";
+      }
+
+      const firstX = cellXById.get(firstMultiCellDownEntry.cells[0]);
+      const secondX = cellXById.get(firstMultiCellDownEntry.cells[1]);
+
+      if (firstX === undefined || secondX === undefined) {
+        return "center";
+      }
+
+      if (secondX > firstX) {
+        return "left";
+      }
+
+      if (secondX < firstX) {
+        return "right";
+      }
+
+      return "center";
+    })();
+
     const activeCellIdSet = new Set(activeCellIds);
 
     return (
@@ -119,19 +165,9 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
         onKeyDown={onKeyDown}
       >
         {topology.cells.map((cell) => {
-          const rowCells = cellsByRow.get(cell.row) ?? [];
-          const rowIndex = rowCells.findIndex(
-            (rowCell) => rowCell.id === cell.id,
-          );
-          const rowMetrics = rowMetricsByRow.get(cell.row);
-
           const x =
-            isHex && rowMetrics
-              ? PADDING +
-                LABEL_SPACE +
-                rowMetrics.offset +
-                (cell.col - rowMetrics.minCol) * cellSize
-              : PADDING + LABEL_SPACE + (cell.col - minCol) * cellSize;
+            cellXById.get(cell.id) ??
+            PADDING + LABEL_SPACE + (cell.col - minCol) * cellSize;
 
           const y = PADDING + LABEL_SPACE + cell.row * cellSize;
           const isSelected = selection.cellId === cell.id;
@@ -180,13 +216,19 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
               {downLabelByCellId[cell.id] ? (
                 <text
                   x={
-                    isHex && rowIndex < rowCells.length - 1
+                    hexDownLabelSide === "left"
                       ? x - 3
-                      : x + cellSize / 2
+                      : hexDownLabelSide === "right"
+                        ? x + cellSize + 3
+                        : x + cellSize / 2
                   }
                   y={y - 3}
                   textAnchor={
-                    isHex && rowIndex < rowCells.length - 1 ? "end" : "middle"
+                    hexDownLabelSide === "left"
+                      ? "end"
+                      : hexDownLabelSide === "right"
+                        ? "start"
+                        : "middle"
                   }
                   fontSize={Math.max(8, Math.floor(cellSize * 0.3125))}
                   fontFamily="Arial, sans-serif"

@@ -11,6 +11,7 @@ import { AppHeader } from "../components/AppHeader";
 import {
   PuzzleLibraryDialog,
   SavePuzzleDialog,
+  ShapeLibraryDialog,
 } from "../components/AppDialogs";
 import { WordLookupDialog } from "../components/WordLookupDialog";
 import type { PuzzleGridHandle } from "../components/PuzzleGrid";
@@ -130,6 +131,7 @@ export default function App() {
   const autofillShouldContinueRef = useRef(true);
   const [isWordLookupOpen, setIsWordLookupOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isShapeLibraryOpen, setIsShapeLibraryOpen] = useState(false);
   const [wordLookupMatches, setWordLookupMatches] = useState<string[]>([]);
   const [wordLookupTotal, setWordLookupTotal] = useState(0);
   const [wordLookupOffset, setWordLookupOffset] = useState(0);
@@ -879,6 +881,25 @@ export default function App() {
     }
   }
 
+  function handleStartFromLibraryShape(shape: ComposedShapeDefinition) {
+    if (!confirmDiscardChanges("start from a library shape")) {
+      return;
+    }
+
+    setShapeDesignerState((prev) =>
+      replaceDesignerLayout(prev, shape.layout, shape.name),
+    );
+    setDesignerGridPresentation(
+      shape.renderHints?.gridPresentation ?? "square",
+    );
+    upsertSessionShape(shape);
+    setSelectedLibraryShapeId(shape.id);
+    setStore((prev) => ({ ...prev, mode: "designer" }));
+    setIsShapeLibraryOpen(false);
+    setIsDirty(true);
+    setUiStatus(`Started designer from shape: ${shape.name}`, "success");
+  }
+
   function handleCaptureSolution() {
     if (!isConstruct) {
       return;
@@ -1550,6 +1571,7 @@ export default function App() {
           onEntryKeyDown={handleClueInputKeyDown}
           onClueChange={handleClueChange}
           onConstruct={handleUseDesignedShape}
+          onStartFromShape={() => setIsShapeLibraryOpen(true)}
           onSaveShape={handleSaveDesignedShape}
           onClearDesignedGrid={handleClearDesignedGrid}
           onLoadDesignedShape={handleLoadDesignedShape}
@@ -1582,6 +1604,14 @@ export default function App() {
           puzzles={PUZZLE_LIBRARY}
           onLoadPuzzle={loadPuzzleFromLibrary}
           onClose={() => setIsLibraryOpen(false)}
+        />
+      ) : null}
+
+      {isShapeLibraryOpen ? (
+        <ShapeLibraryDialog
+          shapes={sessionShapeLibrary}
+          onLoadShape={handleStartFromLibraryShape}
+          onClose={() => setIsShapeLibraryOpen(false)}
         />
       ) : null}
 

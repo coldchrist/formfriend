@@ -3,6 +3,7 @@ import { useRef } from "react";
 type DesignerNotesPanelProps = {
   layoutRowsText: string;
   onConstruct: () => void;
+  onStartFromShape: () => void;
   onSaveShape: () => void;
   onClearGrid: () => void;
   onLoadShape: (file: File) => void | Promise<void>;
@@ -11,6 +12,7 @@ type DesignerNotesPanelProps = {
 export function DesignerNotesPanel({
   layoutRowsText,
   onConstruct,
+  onStartFromShape,
   onSaveShape,
   onClearGrid,
   onLoadShape,
@@ -20,7 +22,13 @@ export function DesignerNotesPanel({
   return (
     <section
       className="clue-panel"
-      style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: "16px" }}
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: "16px",
+      }}
     >
       <input
         ref={loadShapeFileInputRef}
@@ -40,18 +48,10 @@ export function DesignerNotesPanel({
         <button
           type="button"
           className="designer-action-btn designer-action-btn--primary"
-          onClick={onConstruct}
-          title="Switch to Construct mode using this shape"
+          onClick={onStartFromShape}
+          title="Start the design grid from a standard library shape"
         >
-          ✏ Construct
-        </button>
-        <button
-          type="button"
-          className="designer-action-btn"
-          onClick={onSaveShape}
-          title="Save this shape to a file"
-        >
-          💾 Save Shape
+          ⬚ Start from Shape
         </button>
         <button
           type="button"
@@ -63,11 +63,27 @@ export function DesignerNotesPanel({
         </button>
         <button
           type="button"
+          className="designer-action-btn"
+          onClick={onSaveShape}
+          title="Save this shape to a file"
+        >
+          💾 Save Shape
+        </button>
+        <button
+          type="button"
           className="designer-action-btn designer-action-btn--danger"
           onClick={onClearGrid}
           title="Clear the design grid"
         >
           ⌫ Clear Grid
+        </button>
+        <button
+          type="button"
+          className="designer-action-btn"
+          onClick={onConstruct}
+          title="Switch to Construct mode using this shape"
+        >
+          ✏ Construct from this Shape
         </button>
       </div>
 

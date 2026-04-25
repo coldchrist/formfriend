@@ -119,6 +119,62 @@ export function layoutsEqual(
   return serializeLayoutCanonical(left) === serializeLayoutCanonical(right);
 }
 
+function normalizeLayoutRowsUpToTranslation(
+  layout: ComposedShapeLayout,
+): string[] {
+  validateComposedShapeLayout(layout);
+
+  const occupiedPositions: Array<{ row: number; col: number }> = [];
+
+  layout.rows.forEach((rowText, row) => {
+    [...rowText].forEach((primitive, col) => {
+      if (primitive !== ".") {
+        occupiedPositions.push({ row, col });
+      }
+    });
+  });
+
+  if (occupiedPositions.length === 0) {
+    return [];
+  }
+
+  const minRow = Math.min(...occupiedPositions.map((position) => position.row));
+  const maxRow = Math.max(...occupiedPositions.map((position) => position.row));
+  const minCol = Math.min(...occupiedPositions.map((position) => position.col));
+  const maxCol = Math.max(...occupiedPositions.map((position) => position.col));
+
+  const normalizedRows: string[] = [];
+
+  for (let row = minRow; row <= maxRow; row += 1) {
+    let normalizedRow = "";
+
+    for (let col = minCol; col <= maxCol; col += 1) {
+      normalizedRow += layout.rows[row][col];
+    }
+
+    normalizedRows.push(normalizedRow);
+  }
+
+  return normalizedRows;
+}
+
+export function layoutsEquivalentUpToTranslation(
+  left: ComposedShapeLayout,
+  right: ComposedShapeLayout,
+): boolean {
+  if (
+    left.overlapRows !== right.overlapRows ||
+    left.overlapCols !== right.overlapCols
+  ) {
+    return false;
+  }
+
+  return (
+    normalizeLayoutRowsUpToTranslation(left).join(":") ===
+    normalizeLayoutRowsUpToTranslation(right).join(":")
+  );
+}
+
 export function deriveShapeVariants(
   layout: ComposedShapeLayout,
 ): DerivedShapeVariants {
@@ -146,7 +202,7 @@ export function supportsLeftRightVariant(
   }
 
   const { canonical, reflected } = deriveShapeVariants(layout);
-  return !layoutsEqual(canonical, reflected);
+  return !layoutsEquivalentUpToTranslation(canonical, reflected);
 }
 
 export function supportsInversion(
