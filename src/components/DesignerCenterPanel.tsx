@@ -5,6 +5,7 @@ import { buildTopologyFromComposedShapeDefinition } from "../domain/shapeTopolog
 import { placePrimitiveAtSelection } from "../domain/shapeDesignerState";
 import type { ShapePrimitive } from "../domain/shapeDefinition";
 import type { ShapeDesignerState } from "../domain/shapeDesignerState";
+import { isHexPreviewValid } from "../domain/hexPreviewValidation";
 
 type DesignerCenterPanelProps = {
   matchingDesignerLibraryShapeName: string | null;
@@ -29,6 +30,23 @@ export function DesignerCenterPanel({
   onPrimitivePlaced,
   onClearGrid,
 }: DesignerCenterPanelProps) {
+  const hexPreviewTopology =
+    designerGridPresentation === "hex"
+      ? buildTopologyFromComposedShapeDefinition(
+          {
+            kind: "composed",
+            id: "preview",
+            name: "Preview",
+            layout: shapeDesignerState.layout,
+            renderHints: { gridPresentation: "hex" },
+          },
+          safeDesignerPrimitiveSize,
+        )
+      : null;
+
+  const isValidHexPreview = hexPreviewTopology
+    ? isHexPreviewValid(hexPreviewTopology)
+    : true;
   return (
     <>
       <h3 className="center-title">
@@ -74,21 +92,30 @@ export function DesignerCenterPanel({
           />
         </div>
 
-        {designerGridPresentation === "hex" ? (
+        {hexPreviewTopology ? (
           <section className="clue-panel" style={{ minWidth: "220px" }}>
             <h3>Hex Preview</h3>
-            <div className="grid-wrapper">
+            {!isValidHexPreview ? (
+              <div
+                style={{
+                  marginBottom: "0.5rem",
+                  fontSize: "0.85rem",
+                  color: "#92400e",
+                }}
+              >
+                Hex preview invalid: one or more down entries would not remain
+                linear.
+              </div>
+            ) : null}
+            <div
+              className="grid-wrapper"
+              style={{
+                opacity: isValidHexPreview ? 1 : 0.35,
+                filter: isValidHexPreview ? undefined : "grayscale(1)",
+              }}
+            >
               <PuzzleGrid
-                topology={buildTopologyFromComposedShapeDefinition(
-                  {
-                    kind: "composed",
-                    id: "preview",
-                    name: "Preview",
-                    layout: shapeDesignerState.layout,
-                    renderHints: { gridPresentation: "hex" },
-                  },
-                  safeDesignerPrimitiveSize,
-                )}
+                topology={hexPreviewTopology}
                 fillsByCellId={{}}
                 selection={{ cellId: null, direction: "across" }}
                 activeCellIds={[]}

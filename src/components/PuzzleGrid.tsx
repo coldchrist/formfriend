@@ -70,17 +70,31 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
       cells.sort((a, b) => a.col - b.col);
     }
 
-    const maxDisplayedRowLength = Math.max(
-      ...[...cellsByRow.values()].map((cells) => cells.length),
+    const rowMetricsByRow = new Map<
+      number,
+      { minCol: number; maxCol: number; span: number; offset: number }
+    >();
+
+    const maxDisplayedRowSpan = Math.max(
+      ...[...cellsByRow.values()].map((cells) => {
+        const rowMinCol = Math.min(...cells.map((cell) => cell.col));
+        const rowMaxCol = Math.max(...cells.map((cell) => cell.col));
+        return rowMaxCol - rowMinCol + 1;
+      }),
       0,
     );
 
-    const rowOffsetByRow = new Map<number, number>();
     for (const [row, cells] of cellsByRow.entries()) {
-      rowOffsetByRow.set(
-        row,
-        ((maxDisplayedRowLength - cells.length) / 2) * cellSize,
-      );
+      const rowMinCol = Math.min(...cells.map((cell) => cell.col));
+      const rowMaxCol = Math.max(...cells.map((cell) => cell.col));
+      const span = rowMaxCol - rowMinCol + 1;
+
+      rowMetricsByRow.set(row, {
+        minCol: rowMinCol,
+        maxCol: rowMaxCol,
+        span,
+        offset: ((maxDisplayedRowSpan - span) / 2) * cellSize,
+      });
     }
 
     const minCol =
@@ -109,11 +123,15 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
           const rowIndex = rowCells.findIndex(
             (rowCell) => rowCell.id === cell.id,
           );
-          const rowOffset = isHex ? (rowOffsetByRow.get(cell.row) ?? 0) : 0;
+          const rowMetrics = rowMetricsByRow.get(cell.row);
 
-          const x = isHex
-            ? PADDING + LABEL_SPACE + rowOffset + rowIndex * cellSize
-            : PADDING + LABEL_SPACE + (cell.col - minCol) * cellSize;
+          const x =
+            isHex && rowMetrics
+              ? PADDING +
+                LABEL_SPACE +
+                rowMetrics.offset +
+                (cell.col - rowMetrics.minCol) * cellSize
+              : PADDING + LABEL_SPACE + (cell.col - minCol) * cellSize;
 
           const y = PADDING + LABEL_SPACE + cell.row * cellSize;
           const isSelected = selection.cellId === cell.id;

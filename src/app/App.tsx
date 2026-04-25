@@ -1,3 +1,5 @@
+import { buildTopologyFromComposedShapeDefinition } from "../domain/shapeTopology";
+import { isHexPreviewValid } from "../domain/hexPreviewValidation";
 import { getAllStandardShapes } from "../domain/standardShapeLibrary";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DesignerCenterPanel } from "../components/DesignerCenterPanel";
@@ -768,7 +770,36 @@ export default function App() {
     setUiStatus("Cleared designed shape.", "success");
   }
 
+  function isCurrentHexDesignerShapeValid(): boolean {
+    if (designerGridPresentation !== "hex") {
+      return true;
+    }
+
+    try {
+      const definition = buildComposedShapeDefinitionFromDesignerState(
+        shapeDesignerState,
+        designerGridPresentation,
+      );
+
+      const topology = buildTopologyFromComposedShapeDefinition(
+        definition,
+        safeDesignerPrimitiveSize,
+      );
+
+      return isHexPreviewValid(topology);
+    } catch {
+      return false;
+    }
+  }
+
   function handleUseDesignedShape() {
+    if (!isCurrentHexDesignerShapeValid()) {
+      window.alert(
+        "This shape is marked as hex, but its down entries would not remain linear in hex view. Please adjust the design before constructing with it.",
+      );
+      return;
+    }
+
     try {
       const definition = buildComposedShapeDefinitionFromDesignerState(
         shapeDesignerState,
@@ -794,6 +825,13 @@ export default function App() {
   }
 
   function handleSaveDesignedShape() {
+    if (!isCurrentHexDesignerShapeValid()) {
+      window.alert(
+        "This shape is marked as hex, but its down entries would not remain linear in hex view. Please adjust the design before saving it.",
+      );
+      return;
+    }
+
     try {
       const definition = buildComposedShapeDefinitionFromDesignerState(
         shapeDesignerState,
