@@ -76,7 +76,6 @@ export function ShapeDesignerSurface({
         alignSelf: "center",
       }}
     >
-      <h3>Shape Designer</h3>
       <div
         ref={containerRef}
         tabIndex={0}
