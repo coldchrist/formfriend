@@ -1122,11 +1122,11 @@ export default function App() {
     handleCloseWordLookup,
     handleConfirmSaveDialog,
     handleFindWords,
-    handleLoad,
+    handleLoad: rawHandleLoad,
     handleLoadMoreWordLookupMatches,
     handleLoadWordList,
     handleSave,
-    loadPuzzleFromLibrary,
+    loadPuzzleFromLibrary: rawLoadPuzzleFromLibrary,
   } = useAppFileActions({
     store,
     setStore,
@@ -1176,6 +1176,18 @@ export default function App() {
     activeShapeGridPresentation:
       activeShapeDefinition?.renderHints?.gridPresentation ?? "square",
   });
+
+  function handleLoad(file: File) {
+    setIncorrectCellIds(new Set());
+    setIsSolutionCorrect(false);
+    rawHandleLoad(file);
+  }
+
+  function loadPuzzleFromLibrary(puzzle: (typeof PUZZLE_LIBRARY)[number]) {
+    setIncorrectCellIds(new Set());
+    setIsSolutionCorrect(false);
+    rawLoadPuzzleFromLibrary(puzzle);
+  }
 
   const { handleAutofill, handleStopAutofill } = useAutofillActions({
     loadedWordList,
