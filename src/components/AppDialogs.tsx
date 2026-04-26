@@ -1,7 +1,7 @@
 import { isTopologyReflectableAcrossLeadingDiagonal } from "../domain/squareTopology";
 import { parseSerializedLayout } from "../domain/shapeLayout";
 import { supportsLeftRightVariant } from "../domain/shapeTransforms";
-import type { ComposedShapeDefinition } from "../domain/shapeDefinition";
+import type { ShapeDefinition } from "../domain/shapeDefinition";
 import type { FormStyle, SavedPuzzle, ShapeVariant } from "../domain/types";
 
 function getFormTypeTitle(
@@ -284,8 +284,8 @@ export function PuzzleLibraryDialog({
 }
 
 type ShapeLibraryDialogProps = {
-  shapes: ComposedShapeDefinition[];
-  onLoadShape: (shape: ComposedShapeDefinition) => void;
+  shapes: ShapeDefinition[];
+  onLoadShape: (shape: ShapeDefinition) => void;
   onClose: () => void;
 };
 
@@ -348,10 +348,14 @@ export function ShapeLibraryDialog({
                     : "Square"}
                 </div>
                 <div>
-                  {shape.layout.width} × {shape.layout.height}
+                  {shape.kind === "composed"
+                    ? `${shape.layout.width} × ${shape.layout.height}`
+                    : `${shape.width} × ${shape.height}`}
                 </div>
                 <div>
-                  {shape.layout.overlapRows} / {shape.layout.overlapCols}
+                  {shape.kind === "composed"
+                    ? `${shape.layout.overlapRows} / ${shape.layout.overlapCols}`
+                    : "—"}
                 </div>
               </div>
             ))}

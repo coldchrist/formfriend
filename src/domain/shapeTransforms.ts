@@ -1,9 +1,19 @@
 import type {
+  ComposedShapeDefinition,
   ComposedShapeLayout,
   GridPresentation,
   ShapePrimitive,
 } from "./shapeDefinition";
 import { validateComposedShapeLayout } from "./shapeLayout";
+import { buildOccupiedCellsFromComposedLayout } from "./shapeComposition";
+import {
+  expandEntryPath,
+  inferEntryPathFromCoords,
+  orientCellCoordsByReadingPolicy,
+  type CellCoord,
+  type EntryPath,
+  type ExtraEntryReadingPolicy,
+} from "./entryPath";
 
 export type ShapeOrientation = "left" | "right";
 
@@ -262,4 +272,116 @@ export function applyVariantSelection(
   }
 
   return result;
+}
+
+function getExpandedLayoutBounds(
+  layout: ComposedShapeLayout,
+  size: number,
+): { minRow: number; maxRow: number; minCol: number; maxCol: number } {
+  const cells = buildOccupiedCellsFromComposedLayout(layout, size);
+
+  if (cells.length === 0) {
+    return { minRow: 0, maxRow: 0, minCol: 0, maxCol: 0 };
+  }
+
+  return {
+    minRow: Math.min(...cells.map((cell) => cell.row)),
+    maxRow: Math.max(...cells.map((cell) => cell.row)),
+    minCol: Math.min(...cells.map((cell) => cell.col)),
+    maxCol: Math.max(...cells.map((cell) => cell.col)),
+  };
+}
+
+function reflectCoordsHorizontally(
+  coords: CellCoord[],
+  layout: ComposedShapeLayout,
+  size: number,
+): CellCoord[] {
+  const bounds = getExpandedLayoutBounds(layout, size);
+  return coords.map((coord) => ({
+    row: coord.row,
+    col: bounds.minCol + bounds.maxCol - coord.col,
+  }));
+}
+
+function invertCoordsVertically(
+  coords: CellCoord[],
+  layout: ComposedShapeLayout,
+  size: number,
+): CellCoord[] {
+  const bounds = getExpandedLayoutBounds(layout, size);
+  return coords.map((coord) => ({
+    row: bounds.minRow + bounds.maxRow - coord.row,
+    col: coord.col,
+  }));
+}
+
+export function transformExtraEntryPathForVariant(
+  path: EntryPath,
+  layout: ComposedShapeLayout,
+  size: number,
+  orientation: ShapeOrientation,
+  inverted: boolean,
+  readingPolicy: ExtraEntryReadingPolicy,
+): EntryPath {
+  let currentLayout = layout;
+  let coords = expandEntryPath(path, { size });
+
+  if (orientation === "right") {
+    coords = reflectCoordsHorizontally(coords, currentLayout, size);
+    currentLayout = reflectLayoutHorizontally(currentLayout);
+  }
+
+  if (inverted) {
+    coords = invertCoordsVertically(coords, currentLayout, size);
+  }
+
+  const orientedCoords = orientCellCoordsByReadingPolicy(coords, readingPolicy);
+  return inferEntryPathFromCoords(path.id, orientedCoords, path.label);
+}
+
+export function transformExtraEntriesForVariant(
+  entries: EntryPath[] | undefined,
+  layout: ComposedShapeLayout,
+  size: number,
+  orientation: ShapeOrientation,
+  inverted: boolean,
+  readingPolicy: ExtraEntryReadingPolicy,
+): EntryPath[] | undefined {
+  if (!entries?.length) {
+    return entries;
+  }
+
+  return entries.map((entry) =>
+    transformExtraEntryPathForVariant(
+      entry,
+      layout,
+      size,
+      orientation,
+      inverted,
+      readingPolicy,
+    ),
+  );
+}
+
+export function transformComposedShapeDefinitionForVariant(
+  definition: ComposedShapeDefinition,
+  size: number,
+  orientation: ShapeOrientation,
+  inverted: boolean,
+  readingPolicy: ExtraEntryReadingPolicy,
+): ComposedShapeDefinition {
+  return {
+    ...definition,
+    layout: applyVariantSelection(definition.layout, orientation, inverted),
+    extraEntries: transformExtraEntriesForVariant(
+      definition.extraEntries,
+      definition.layout,
+      size,
+      orientation,
+      inverted,
+      readingPolicy,
+    ),
+    extraEntryReadingPolicy: readingPolicy,
+  };
 }

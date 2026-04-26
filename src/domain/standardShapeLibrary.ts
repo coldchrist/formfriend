@@ -1,238 +1,342 @@
-import type { ComposedShapeDefinition } from "./shapeDefinition";
+import type {
+  CanonicalShapeDefinition,
+  ShapeDefinition,
+} from "./shapeDefinition";
+import { normalizeShapeDefinition } from "./shapeSerialization";
 
 /**
  * Canonical standard shapes expressed as composed layouts.
  * These are the replacements for the old built-in families.
  */
 
-const STANDARD_SHAPES: ComposedShapeDefinition[] = [
+const STANDARD_SHAPES: CanonicalShapeDefinition[] = [
   {
+    version: 1,
     kind: "composed",
     id: "square",
     name: "Square",
-    layout: {
-      width: 1,
-      height: 1,
-      rows: ["S"],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "S",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "half-square",
     name: "Half-square",
-    layout: {
-      width: 1,
-      height: 1,
-      rows: ["l"],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "l",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "windmill",
     name: "Windmill",
-    layout: {
-      width: 2,
-      height: 2,
-      rows: ["S.", ".S"],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "S.:.S",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "cambridge-hexagon",
     name: "Cambridge Hexagon",
-    layout: {
-      width: 2,
-      height: 2,
-      rows: ["Sl", "RS"],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "Sl:RS",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "hollow-diamond",
     name: "Hollow Diamond",
-    layout: {
-      width: 4,
-      height: 4,
-      rows: [".rl.", "rLRl", "RlrL", ".RL."],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: ".rl.:rLRl:RlrL:.RL.",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "chevron",
     name: "Chevron",
-    layout: {
-      width: 3,
-      height: 2,
-      rows: ["rl.", "LR."],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "rl.:LR.",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "diamond",
     name: "Diamond",
-    layout: {
-      width: 3,
-      height: 2,
-      rows: ["rl.", "RL."],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "rl.:RL.",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "oblong",
     name: "Oblong",
-    layout: {
-      width: 3,
-      height: 3,
-      rows: ["rl.", "RSl", ".RL"],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "rl.:RSl:.RL",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "pentagon",
     name: "Pentagon",
-    layout: {
-      width: 3,
-      height: 2,
-      rows: ["rl.", "RS."],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "rl.:RS.",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "pyramid",
     name: "Pyramid",
-    layout: {
-      width: 2,
-      height: 1,
-      rows: ["rl"],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "rl",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
+    kind: "composed",
+    id: "pyramidal-windmill",
+    name: "Pyramidal windmill",
+    extraEntryReadingPolicy: "rightward-then-downward",
+    layout: "rl..:..RL",
+    overlapRows: 1,
+    overlapCols: 1,
+    renderHints: {
+      gridPresentation: "square",
+    },
+    extraEntries: [
+      {
+        kind: "parametricLine",
+        id: "X1",
+        label: "X1",
+        segment: {
+          kind: "parametricLine",
+          start: {
+            row: 0,
+            col: {
+              kind: "sizeAffine",
+              sizeMultiplier: 1,
+              offset: -1,
+            },
+          },
+          direction: "southeast",
+          length: {
+            kind: "sizeAffine",
+            sizeMultiplier: 2,
+            offset: -1,
+          },
+        },
+      },
+    ],
+  },
+  {
+    version: 1,
+    kind: "composed",
+    id: "left-fan",
+    name: "Left fan",
+    layout: "rr:r.",
+    overlapRows: 0,
+    overlapCols: 0,
+    renderHints: {
+      gridPresentation: "hex",
+    },
+    extraEntries: [
+      {
+        kind: "parametricLine",
+        id: "X1",
+        label: "X1",
+        segment: {
+          kind: "parametricLine",
+          start: {
+            row: 0,
+            col: {
+              kind: "sizeAffine",
+              sizeMultiplier: 2,
+              offset: -1,
+            },
+          },
+          direction: "southwest",
+          length: {
+            kind: "sizeAffine",
+            sizeMultiplier: 2,
+            offset: 0,
+          },
+        },
+      },
+    ],
+    extraEntryReadingPolicy: "downward-then-rightward",
+  },
+  {
+    version: 1,
+    kind: "composed",
+    id: "right-whirligig",
+    name: "Right whirligig",
+    layout: "Rr:Ll",
+    overlapRows: 1,
+    overlapCols: 1,
+    renderHints: {
+      gridPresentation: "square",
+    },
+    extraEntries: [],
+    extraEntryReadingPolicy: "downward-then-rightward",
+  },
+  {
+    version: 1,
+    kind: "composed",
+    id: "left-whirligig",
+    name: "Left whirligig",
+    layout: "lL:rR",
+    overlapRows: 1,
+    overlapCols: 1,
+    renderHints: {
+      gridPresentation: "square",
+    },
+    extraEntries: [],
+    extraEntryReadingPolicy: "downward-then-rightward",
+  },
+  {
+    version: 1,
+    kind: "composed",
+    id: "right-fan",
+    name: "Right fan",
+    layout: "ll:.l",
+    overlapRows: 0,
+    overlapCols: 0,
+    renderHints: {
+      gridPresentation: "hex",
+    },
+    extraEntries: [
+      {
+        kind: "parametricLine",
+        id: "X1",
+        label: "X1",
+        segment: {
+          kind: "parametricLine",
+          start: {
+            row: 0,
+            col: 0,
+          },
+          direction: "southeast",
+          length: {
+            kind: "sizeAffine",
+            sizeMultiplier: 2,
+            offset: 0,
+          },
+        },
+      },
+    ],
+    extraEntryReadingPolicy: "downward-then-rightward",
+  },
+  {
+    version: 1,
+    kind: "composed",
+    id: "octagon",
+    name: "Octagon",
+    layout: "rSl:SSS:RSL",
+    overlapRows: 1,
+    overlapCols: 1,
+    renderHints: {
+      gridPresentation: "hex",
+    },
+    extraEntries: [],
+    extraEntryReadingPolicy: "downward-then-rightward",
+  },
+  {
+    version: 1,
     kind: "composed",
     id: "rhomboid",
     name: "Rhomboid",
-    layout: {
-      width: 2,
-      height: 1,
-      rows: ["Rl"],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "Rl",
+    overlapRows: 1,
+    overlapCols: 1,
   },
   {
+    version: 1,
     kind: "composed",
     id: "pygmy-hourglass",
     name: "Pygmy Hourglass",
-    layout: {
-      width: 2,
-      height: 2,
-      rows: [".L", "r."],
-      overlapRows: 3,
-      overlapCols: 2,
-    },
+    layout: ".L:r.",
+    overlapRows: 3,
+    overlapCols: 2,
     renderHints: {
       gridPresentation: "hex",
     },
   },
   {
+    version: 1,
     kind: "composed",
     id: "triple-pygmy-hourglass",
     name: "Triple Pygmy Hourglass",
-    layout: {
-      width: 2,
-      height: 2,
-      rows: [".L", "r."],
-      overlapRows: 5,
-      overlapCols: 3,
-    },
+    layout: ".L:r.",
+    overlapRows: 5,
+    overlapCols: 3,
     renderHints: {
       gridPresentation: "hex",
     },
   },
   {
+    version: 1,
     kind: "composed",
     id: "truncated-pyramid",
     name: "Truncated Pyramid",
-    layout: {
-      width: 2,
-      height: 1,
-      rows: ["rl"],
-      overlapRows: 0,
-      overlapCols: 0,
-    },
+    layout: "rl",
+    overlapRows: 0,
+    overlapCols: 0,
   },
   {
+    version: 1,
     kind: "composed",
     id: "left-star",
     name: "Left Star",
-    layout: {
-      width: 4,
-      height: 4,
-      rows: ["..r.", ".SSL", "rSS.", ".L.."],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "..r.:.SSL:rSS.:.L..",
+    overlapRows: 1,
+    overlapCols: 1,
     renderHints: {
       gridPresentation: "hex",
     },
   },
   {
+    version: 1,
     kind: "composed",
     id: "right-star",
     name: "Right Star",
-    layout: {
-      width: 4,
-      height: 4,
-      rows: [".l..", "RSS.", ".SSl", "..R."],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: ".l..:RSS.:.SSl:..R.",
+    overlapRows: 1,
+    overlapCols: 1,
     renderHints: {
       gridPresentation: "hex",
     },
   },
   {
+    version: 1,
+    kind: "composed",
+    id: "hexagon",
+    name: "Hexagon",
+    layout: "rSl:RSL",
+    overlapRows: 1,
+    overlapCols: 1,
+    renderHints: {
+      gridPresentation: "square",
+    },
+    extraEntries: [],
+    extraEntryReadingPolicy: "downward-then-rightward",
+  },
+  {
+    version: 1,
     kind: "composed",
     id: "enneagon",
     name: "Enneagon",
-    layout: {
-      width: 3,
-      height: 3,
-      rows: ["rl.", "RSS", ".S."],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
-  },
-  {
-    kind: "composed",
-    id: "whirligig",
-    name: "Whirligig",
-    layout: {
-      width: 2,
-      height: 2,
-      rows: ["lL", "rR"],
-      overlapRows: 1,
-      overlapCols: 1,
-    },
+    layout: "rl.:RSS:.S.",
+    overlapRows: 1,
+    overlapCols: 1,
   },
 ];
 
@@ -241,12 +345,23 @@ const STANDARD_SHAPES: ComposedShapeDefinition[] = [
  */
 export const DEFAULT_STANDARD_SHAPE_ID = "square";
 
-export function getAllStandardShapes(): ComposedShapeDefinition[] {
+export function getAllStandardShapeDefinitions(): CanonicalShapeDefinition[] {
   return [...STANDARD_SHAPES].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function getStandardShapeById(
+export function getAllStandardShapes(): ShapeDefinition[] {
+  return getAllStandardShapeDefinitions().map((shape) =>
+    normalizeShapeDefinition(shape),
+  );
+}
+
+export function getStandardShapeDefinitionById(
   id: string,
-): ComposedShapeDefinition | undefined {
+): CanonicalShapeDefinition | undefined {
   return STANDARD_SHAPES.find((shape) => shape.id === id);
+}
+
+export function getStandardShapeById(id: string): ShapeDefinition | undefined {
+  const shape = getStandardShapeDefinitionById(id);
+  return shape ? normalizeShapeDefinition(shape) : undefined;
 }

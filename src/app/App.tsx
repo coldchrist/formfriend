@@ -1,6 +1,6 @@
 import { buildTopologyFromComposedShapeDefinition } from "../domain/shapeTopology";
 import { isHexPreviewValid } from "../domain/hexPreviewValidation";
-import { getAllStandardShapes } from "../domain/standardShapeLibrary";
+import { getAllStandardShapeDefinitions } from "../domain/standardShapeLibrary";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DesignerCenterPanel } from "../components/DesignerCenterPanel";
 import { LeftSidebar } from "../components/LeftSidebar";
@@ -37,9 +37,17 @@ import {
   clearDesignerLayout,
 } from "../domain/shapeDesignerState";
 import type {
-  ComposedShapeDefinition,
+  CanonicalShapeDefinition,
+  ShapeDefinition,
   ShapePrimitive,
 } from "../domain/shapeDefinition";
+import type { EntryPath, ExtraEntryReadingPolicy } from "../domain/entryPath";
+import {
+  DEFAULT_EXTRA_ENTRY_READING_POLICY,
+  describeEntryPath,
+  expandEntryPathToCellIds,
+  inferParametricEntryPathFromCellIds,
+} from "../domain/entryPath";
 import { isTopologyReflectableAcrossLeadingDiagonal } from "../domain/squareTopology";
 import { parseWordListText } from "../domain/wordList";
 import type { LoadedWordList } from "../domain/wordList";
@@ -55,7 +63,10 @@ import type {
   FormStyle,
   ShapeVariant,
 } from "../domain/types";
-import { buildComposedShapeDefinitionFromDesignerState } from "../domain/shapeSerialization";
+import {
+  buildComposedShapeDefinitionFromDesignerState,
+  normalizeShapeDefinition,
+} from "../domain/shapeSerialization";
 import { parseSerializedLayout } from "../domain/shapeLayout";
 import {
   applyVariantSelection,
@@ -139,29 +150,32 @@ export default function App() {
     createInitialShapeDesignerState(),
   );
   const [sessionShapeLibrary, setSessionShapeLibrary] = useState<
-    ComposedShapeDefinition[]
-  >(() => getAllStandardShapes());
+    CanonicalShapeDefinition[]
+  >(() => getAllStandardShapeDefinitions());
   const [selectedLibraryShapeId, setSelectedLibraryShapeId] = useState<
     string | null
   >(null);
   const [designerGridPresentation, setDesignerGridPresentation] = useState<
     "square" | "hex"
   >("square");
-
+  const [designerExtraEntries, setDesignerExtraEntries] = useState<EntryPath[]>(
+    [],
+  );
+  const [designerExtraEntryReadingPolicy, setDesignerExtraEntryReadingPolicy] =
+    useState<ExtraEntryReadingPolicy>(DEFAULT_EXTRA_ENTRY_READING_POLICY);
+  const [isDefiningExtraEntry, setIsDefiningExtraEntry] = useState(false);
+  const [pendingExtraEntryCellIds, setPendingExtraEntryCellIds] = useState<
+    string[]
+  >([]);
+  const [selectedDesignerExtraEntryId, setSelectedDesignerExtraEntryId] =
+    useState<string | null>(null);
+  const normalizedSessionShapeLibrary = useMemo(
+    () => sessionShapeLibrary.map((shape) => normalizeShapeDefinition(shape)),
+    [sessionShapeLibrary],
+  );
   const isSolve = activeWorkspace === "solve";
   const isSolveStrict = isSolve && solveStore.mode === "solve_strict";
   const isSolveCheckable = isSolve && solveStore.mode === "solve_checkable";
-  console.log(
-    "[render] isSolve:",
-    isSolve,
-    "solveStore.mode:",
-    solveStore.mode,
-    "isSolveCheckable:",
-    isSolveCheckable,
-    "solveStore.solution:",
-    solveStore.solution,
-  );
-
   const isDirty = isSolve ? isSolveDirty : isConstructDirty;
   const setIsDirty = isSolve ? setIsSolveDirty : setIsConstructDirty;
 
@@ -181,12 +195,110 @@ export default function App() {
         Math.min(15, shapeDesignerState.size),
       )
     : minimumDesignerPrimitiveSize;
+  const designerPreviewTopology = useMemo(() => {
+    try {
+      const definition = buildComposedShapeDefinitionFromDesignerState(
+        shapeDesignerState,
+        designerGridPresentation,
+        designerExtraEntries,
+        designerExtraEntryReadingPolicy,
+      );
+      return buildTopologyFromComposedShapeDefinition(
+        definition,
+        safeDesignerPrimitiveSize,
+      );
+    } catch {
+      const definition = buildComposedShapeDefinitionFromDesignerState(
+        shapeDesignerState,
+        designerGridPresentation,
+        [],
+        designerExtraEntryReadingPolicy,
+      );
+      return buildTopologyFromComposedShapeDefinition(
+        definition,
+        safeDesignerPrimitiveSize,
+      );
+    }
+  }, [
+    designerExtraEntries,
+    designerGridPresentation,
+    designerExtraEntryReadingPolicy,
+    safeDesignerPrimitiveSize,
+    shapeDesignerState,
+  ]);
+
+  useEffect(() => {
+    if (designerExtraEntries.length === 0) {
+      return;
+    }
+
+    const validEntries = designerExtraEntries.filter((entry) => {
+      try {
+        const definition = buildComposedShapeDefinitionFromDesignerState(
+          shapeDesignerState,
+          designerGridPresentation,
+          [entry],
+          designerExtraEntryReadingPolicy,
+        );
+        buildTopologyFromComposedShapeDefinition(
+          definition,
+          safeDesignerPrimitiveSize,
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    if (validEntries.length !== designerExtraEntries.length) {
+      const validIds = new Set(validEntries.map((entry) => entry.id));
+      setDesignerExtraEntries(validEntries);
+      setSelectedDesignerExtraEntryId((prev) =>
+        prev && !validIds.has(prev) ? null : prev,
+      );
+    }
+  }, [
+    designerExtraEntries,
+    designerGridPresentation,
+    designerExtraEntryReadingPolicy,
+    safeDesignerPrimitiveSize,
+    shapeDesignerState,
+  ]);
+
+  const selectedDesignerExtraEntryCellIds = useMemo(() => {
+    const selected = designerExtraEntries.find(
+      (entry) => entry.id === selectedDesignerExtraEntryId,
+    );
+
+    if (!selected) {
+      return [];
+    }
+
+    try {
+      const expandedCellIds = expandEntryPathToCellIds(selected, {
+        size: safeDesignerPrimitiveSize,
+      });
+
+      return expandedCellIds;
+    } catch {
+      return [];
+    }
+  }, [
+    designerExtraEntries,
+    designerPreviewTopology,
+    safeDesignerPrimitiveSize,
+    selectedDesignerExtraEntryId,
+  ]);
+
   const currentShapeVariant: ShapeVariant = store.spec.shapeVariant ?? "left";
   const currentFormStyle: FormStyle = store.spec.formStyle ?? "double";
   const currentInverted = store.spec.inverted ?? false;
 
   const canBeSingle = useMemo(() => {
-    return isTopologyReflectableAcrossLeadingDiagonal(store.topology);
+    return (
+      !store.topology.entries.some((entry) => entry.direction === "extra") &&
+      isTopologyReflectableAcrossLeadingDiagonal(store.topology)
+    );
   }, [store.topology]);
 
   const allowedSizes = getAllowedSizes();
@@ -209,14 +321,15 @@ export default function App() {
 
   const selectedLibraryShape = useMemo(
     () =>
-      sessionShapeLibrary.find((item) => item.id === selectedLibraryShapeId) ??
-      null,
-    [sessionShapeLibrary, selectedLibraryShapeId],
+      normalizedSessionShapeLibrary.find(
+        (item) => item.id === selectedLibraryShapeId,
+      ) ?? null,
+    [normalizedSessionShapeLibrary, selectedLibraryShapeId],
   );
 
   const currentCanonicalLibraryShape = useMemo(() => {
     if (store.spec.shapeId) {
-      const byId = sessionShapeLibrary.find(
+      const byId = normalizedSessionShapeLibrary.find(
         (item) => item.id === store.spec.shapeId,
       );
       if (byId) {
@@ -225,7 +338,7 @@ export default function App() {
     }
 
     return selectedLibraryShape ?? null;
-  }, [sessionShapeLibrary, store.spec.shapeId, selectedLibraryShape]);
+  }, [normalizedSessionShapeLibrary, store.spec.shapeId, selectedLibraryShape]);
 
   const activeShapeDefinition = useMemo(() => {
     return currentCanonicalLibraryShape ?? selectedLibraryShape ?? null;
@@ -245,7 +358,11 @@ export default function App() {
       );
     }
 
-    for (const shape of sessionShapeLibrary) {
+    for (const shape of normalizedSessionShapeLibrary) {
+      if (shape.kind !== "composed") {
+        continue;
+      }
+
       let supportsLeftRight = false;
       let supportsInvert = false;
 
@@ -291,37 +408,68 @@ export default function App() {
     }
 
     return null;
-  }, [sessionShapeLibrary, shapeDesignerState.layout]);
+  }, [normalizedSessionShapeLibrary, shapeDesignerState.layout]);
 
   const currentGridPresentation = useMemo(() => {
     return activeShapeDefinition?.renderHints?.gridPresentation ?? "square";
   }, [activeShapeDefinition]);
 
   const currentShapeSupportsLeftRight = useMemo(() => {
-    if (currentCanonicalLibraryShape) {
-      return supportsLeftRightVariant(
-        currentCanonicalLibraryShape.layout,
-        currentCanonicalLibraryShape.renderHints?.gridPresentation ?? "square",
-      );
-    }
+    const baseLayout =
+      currentCanonicalLibraryShape?.kind === "composed"
+        ? currentCanonicalLibraryShape.layout
+        : currentComposedLayout;
 
-    if (!currentComposedLayout) {
+    const gridPres =
+      currentCanonicalLibraryShape?.renderHints?.gridPresentation ??
+      currentGridPresentation;
+
+    if (!baseLayout) {
       return false;
     }
 
-    return supportsLeftRightVariant(
-      currentComposedLayout,
-      currentGridPresentation,
+    if (!supportsLeftRightVariant(baseLayout, gridPres)) {
+      return false;
+    }
+
+    const reflectedLayout = applyVariantSelection(baseLayout, "right", false);
+
+    const alreadyCoveredByLibrary = normalizedSessionShapeLibrary.some(
+      (shape) => {
+        if (shape.kind !== "composed") {
+          return false;
+        }
+
+        if (shape.id === currentCanonicalLibraryShape?.id) {
+          return false;
+        }
+
+        const shapeGridPres = shape.renderHints?.gridPresentation ?? "square";
+        if (shapeGridPres !== gridPres) {
+          return false;
+        }
+
+        try {
+          return layoutsEqual(shape.layout, reflectedLayout);
+        } catch {
+          return false;
+        }
+      },
     );
+
+    return !alreadyCoveredByLibrary;
   }, [
     currentCanonicalLibraryShape,
     currentComposedLayout,
     currentGridPresentation,
+    normalizedSessionShapeLibrary,
   ]);
 
   const currentShapeSupportsInversion = useMemo(() => {
     const baseLayout =
-      currentCanonicalLibraryShape?.layout ?? currentComposedLayout;
+      currentCanonicalLibraryShape?.kind === "composed"
+        ? currentCanonicalLibraryShape.layout
+        : currentComposedLayout;
     const gridPres =
       currentCanonicalLibraryShape?.renderHints?.gridPresentation ??
       currentGridPresentation;
@@ -339,23 +487,29 @@ export default function App() {
     // shape already in the library, inversion is redundant — the user
     // can just pick that shape directly.
     const invertedLayout = applyVariantSelection(baseLayout, "left", true);
-    const alreadyCoveredByLibrary = sessionShapeLibrary.some((shape) => {
-      if (shape.id === currentCanonicalLibraryShape?.id) {
-        return false;
-      }
-      try {
-        return layoutsEqual(shape.layout, invertedLayout);
-      } catch {
-        return false;
-      }
-    });
+    const alreadyCoveredByLibrary = normalizedSessionShapeLibrary.some(
+      (shape) => {
+        if (shape.kind !== "composed") {
+          return false;
+        }
+
+        if (shape.id === currentCanonicalLibraryShape?.id) {
+          return false;
+        }
+        try {
+          return layoutsEqual(shape.layout, invertedLayout);
+        } catch {
+          return false;
+        }
+      },
+    );
 
     return !alreadyCoveredByLibrary;
   }, [
     currentCanonicalLibraryShape,
     currentComposedLayout,
     currentGridPresentation,
-    sessionShapeLibrary,
+    normalizedSessionShapeLibrary,
   ]);
 
   const formTypeTitle = getFormTypeTitle(
@@ -450,6 +604,7 @@ export default function App() {
       store.topology,
       store.selection.cellId,
       store.selection.direction,
+      store.selection.entryId,
     );
   }, [store.selection, store.topology]);
 
@@ -464,6 +619,10 @@ export default function App() {
     [store.topology.entries],
   );
 
+  const extraEntries = useMemo(
+    () => store.topology.entries.filter((entry) => entry.direction === "extra"),
+    [store.topology.entries],
+  );
   const formModel = useMemo(() => {
     return buildFormModelFromTopology(store.spec, store.topology);
   }, [store.spec, store.topology]);
@@ -518,6 +677,21 @@ export default function App() {
       )
       .sort((a, b) => a.number - b.number);
   }, [downEntries, currentFormStyle, presentationNumbering.numberByEntryId]);
+  const displayedExtraEntries = useMemo(() => {
+    if (currentFormStyle === "single") {
+      return [];
+    }
+
+    return extraEntries
+      .map((entry) =>
+        relabelEntry(
+          entry,
+          presentationNumbering.numberByEntryId[entry.id] ?? entry.number,
+          false,
+        ),
+      )
+      .sort((a, b) => a.number - b.number);
+  }, [extraEntries, currentFormStyle, presentationNumbering.numberByEntryId]);
 
   const singleClueEntries = useMemo(() => {
     if (
@@ -691,14 +865,6 @@ export default function App() {
   }
 
   function handleConstructFromLoadedForm() {
-    console.log(
-      "[construct from form] solveStore.solution:",
-      solveStore.solution,
-    );
-    console.log(
-      "[construct from form] showSolution will be asked:",
-      Boolean(solveStore.solution),
-    );
     const hasSolution = Boolean(solveStore.solution);
     let showSolution = false;
 
@@ -711,38 +877,6 @@ export default function App() {
     const loadedFormModel = buildFormModelFromTopology(
       solveStore.spec,
       solveStore.topology,
-    );
-    console.log("[construct from form] showSolution:", showSolution);
-    console.log(
-      "[construct from form] state being set:",
-      showSolution && solveStore.solution ? "SOLUTION" : "EMPTY",
-    );
-    const firstKey = Object.keys(
-      solveStore.solution?.fillsByFormWordId ?? {},
-    )[0];
-    const constructFirstKey = buildFormModelFromTopology(
-      solveStore.spec,
-      solveStore.topology,
-    ).formWords[0]?.id;
-    console.log(
-      "[construct from form] solution key sample:",
-      firstKey,
-      "construct formWord key:",
-      constructFirstKey,
-    );
-    const solutionKeys = Object.keys(
-      solveStore.solution?.fillsByFormWordId ?? {},
-    );
-    const solutionValues = Object.values(
-      solveStore.solution?.fillsByFormWordId ?? {},
-    );
-    console.log(
-      "[construct from form] solution keys:",
-      solutionKeys.slice(0, 3),
-    );
-    console.log(
-      "[construct from form] solution values:",
-      solutionValues.slice(0, 3),
     );
     setConstructStore({
       mode: "construct",
@@ -769,6 +903,11 @@ export default function App() {
 
   function handleClearDesignedGrid() {
     setShapeDesignerState((prev) => clearDesignerLayout(prev));
+    setDesignerExtraEntries([]);
+    setDesignerExtraEntryReadingPolicy(DEFAULT_EXTRA_ENTRY_READING_POLICY);
+    setPendingExtraEntryCellIds([]);
+    setIsDefiningExtraEntry(false);
+    setSelectedDesignerExtraEntryId(null);
     setUiStatus("Cleared designed shape.", "success");
   }
 
@@ -781,6 +920,8 @@ export default function App() {
       const definition = buildComposedShapeDefinitionFromDesignerState(
         shapeDesignerState,
         designerGridPresentation,
+        designerExtraEntries,
+        designerExtraEntryReadingPolicy,
       );
 
       const topology = buildTopologyFromComposedShapeDefinition(
@@ -806,6 +947,8 @@ export default function App() {
       const definition = buildComposedShapeDefinitionFromDesignerState(
         shapeDesignerState,
         designerGridPresentation,
+        designerExtraEntries,
+        designerExtraEntryReadingPolicy,
       );
 
       upsertSessionShape(definition);
@@ -838,6 +981,8 @@ export default function App() {
       const definition = buildComposedShapeDefinitionFromDesignerState(
         shapeDesignerState,
         designerGridPresentation,
+        designerExtraEntries,
+        designerExtraEntryReadingPolicy,
       );
 
       if (!definition.name.trim()) {
@@ -871,6 +1016,14 @@ export default function App() {
       setShapeDesignerState((prev) =>
         replaceDesignerLayout(prev, definition.layout, definition.name),
       );
+      setDesignerExtraEntries(definition.extraEntries ?? []);
+      setDesignerExtraEntryReadingPolicy(
+        definition.extraEntryReadingPolicy ??
+          DEFAULT_EXTRA_ENTRY_READING_POLICY,
+      );
+      setPendingExtraEntryCellIds([]);
+      setIsDefiningExtraEntry(false);
+      setSelectedDesignerExtraEntryId(null);
       upsertSessionShape(definition);
       setStore((prev) => ({ ...prev, mode: "designer" }));
       setUiStatus(`Loaded shape: ${definition.name}`, "success");
@@ -881,7 +1034,12 @@ export default function App() {
     }
   }
 
-  function handleStartFromLibraryShape(shape: ComposedShapeDefinition) {
+  function handleStartFromLibraryShape(shape: ShapeDefinition) {
+    if (shape.kind !== "composed") {
+      window.alert("Only composed shapes can be loaded in Designer mode.");
+      return;
+    }
+
     if (!confirmDiscardChanges("start from a library shape")) {
       return;
     }
@@ -889,6 +1047,13 @@ export default function App() {
     setShapeDesignerState((prev) =>
       replaceDesignerLayout(prev, shape.layout, shape.name),
     );
+    setDesignerExtraEntries(shape.extraEntries ?? []);
+    setDesignerExtraEntryReadingPolicy(
+      shape.extraEntryReadingPolicy ?? DEFAULT_EXTRA_ENTRY_READING_POLICY,
+    );
+    setPendingExtraEntryCellIds([]);
+    setIsDefiningExtraEntry(false);
+    setSelectedDesignerExtraEntryId(null);
     setDesignerGridPresentation(
       shape.renderHints?.gridPresentation ?? "square",
     );
@@ -898,6 +1063,100 @@ export default function App() {
     setIsShapeLibraryOpen(false);
     setIsDirty(true);
     setUiStatus(`Started designer from shape: ${shape.name}`, "success");
+  }
+  function handleBeginExtraEntryDefinition() {
+    setPendingExtraEntryCellIds([]);
+    setSelectedDesignerExtraEntryId(null);
+    setIsDefiningExtraEntry(true);
+    setUiStatus("Click cells in order to define the extra word path.", "info");
+  }
+
+  function handleCancelExtraEntryDefinition() {
+    setPendingExtraEntryCellIds([]);
+    setIsDefiningExtraEntry(false);
+    setUiStatus("Canceled extra word definition.", "info");
+  }
+
+  function handleDesignerExtraCellClick(cellId: string) {
+    if (!isDefiningExtraEntry) {
+      return;
+    }
+
+    setPendingExtraEntryCellIds((prev) => {
+      if (prev.includes(cellId)) {
+        return prev;
+      }
+      return [...prev, cellId];
+    });
+  }
+
+  function handleFinishExtraEntryDefinition() {
+    try {
+      const nextNumber = designerExtraEntries.length + 1;
+      const path = inferParametricEntryPathFromCellIds(
+        `X${nextNumber}`,
+        pendingExtraEntryCellIds,
+        safeDesignerPrimitiveSize,
+        `X${nextNumber}`,
+      );
+
+      const definition = buildComposedShapeDefinitionFromDesignerState(
+        shapeDesignerState,
+        designerGridPresentation,
+        [...designerExtraEntries, path],
+        designerExtraEntryReadingPolicy,
+      );
+      buildTopologyFromComposedShapeDefinition(
+        definition,
+        safeDesignerPrimitiveSize,
+      );
+
+      setDesignerExtraEntries((prev) => [...prev, path]);
+      setSelectedDesignerExtraEntryId(path.id);
+      setPendingExtraEntryCellIds([]);
+      setIsDefiningExtraEntry(false);
+      setIsDirty(true);
+      setUiStatus(`Added extra word ${path.label ?? path.id}.`, "success");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Invalid extra word path.";
+      window.alert(message);
+    }
+  }
+
+  function renumberDesignerExtraEntries(entries: EntryPath[]): EntryPath[] {
+    return entries.map((entry, index) => {
+      const nextId = `X${index + 1}`;
+      return {
+        ...entry,
+        id: nextId,
+        label: nextId,
+      };
+    });
+  }
+
+  function handleRemoveDesignerExtraEntry(id: string) {
+    const selectedBeforeRemove = selectedDesignerExtraEntryId;
+
+    setDesignerExtraEntries((prev) => {
+      const remaining = prev.filter((entry) => entry.id !== id);
+      const renumbered = renumberDesignerExtraEntries(remaining);
+      const idByPreviousId = new Map(
+        remaining.map((entry, index) => [entry.id, `X${index + 1}`]),
+      );
+
+      setSelectedDesignerExtraEntryId(
+        selectedBeforeRemove === id
+          ? null
+          : selectedBeforeRemove
+            ? (idByPreviousId.get(selectedBeforeRemove) ?? null)
+            : null,
+      );
+
+      return renumbered;
+    });
+
+    setIsDirty(true);
   }
 
   function handleCaptureSolution() {
@@ -1310,22 +1569,13 @@ export default function App() {
       downEntries,
       displayedAcrossEntries,
       displayedDownEntries,
+      displayedExtraEntries,
       singleClueEntries,
       currentFormStyle,
     });
 
   // Solve mode gets its own full-width two-panel layout
   if (isSolve) {
-    console.log("[CHECK BUTTON TEST App]", {
-      isSolve,
-      storeMode: store.mode,
-      solveStoreMode: solveStore.mode,
-      isSolveCheckable,
-      hasStoreSolution: Boolean(store.solution),
-      hasSolveStoreSolution: Boolean(solveStore.solution),
-      title: store.content.metadata.title,
-    });
-
     return (
       <div className="app-shell">
         <AppHeader
@@ -1380,6 +1630,7 @@ export default function App() {
             singleClueEntries={singleClueEntries}
             displayedAcrossEntries={displayedAcrossEntries}
             displayedDownEntries={displayedDownEntries}
+            displayedExtraEntries={displayedExtraEntries}
             cluesByEntryId={cluesByEntryId}
             activeClueEntryId={activeClueEntryId}
             activeEntry={activeEntry}
@@ -1426,7 +1677,7 @@ export default function App() {
           storeMode={store.mode}
           currentSize={store.spec.size}
           shapeDisplayName={store.spec.shapeName}
-          sessionShapeLibrary={sessionShapeLibrary}
+          sessionShapeLibrary={normalizedSessionShapeLibrary}
           selectedLibraryShapeId={selectedLibraryShapeId}
           isConstruct={isConstruct}
           designerState={{
@@ -1541,6 +1792,11 @@ export default function App() {
               shapeDesignerState={shapeDesignerState}
               safeDesignerPrimitiveSize={safeDesignerPrimitiveSize}
               designerGridPresentation={designerGridPresentation}
+              topology={designerPreviewTopology}
+              isDefiningExtraEntry={isDefiningExtraEntry}
+              pendingExtraEntryCellIds={pendingExtraEntryCellIds}
+              selectedExtraEntryCellIds={selectedDesignerExtraEntryCellIds}
+              onExtraEntryCellClick={handleDesignerExtraCellClick}
               onSelectCell={(row, col) =>
                 setShapeDesignerState((prev) => ({
                   ...prev,
@@ -1564,6 +1820,7 @@ export default function App() {
           singleClueEntries={singleClueEntries}
           displayedAcrossEntries={displayedAcrossEntries}
           displayedDownEntries={displayedDownEntries}
+          displayedExtraEntries={displayedExtraEntries}
           cluesByEntryId={cluesByEntryId}
           activeClueEntryId={activeClueEntryId}
           activeEntry={activeEntry}
@@ -1575,6 +1832,20 @@ export default function App() {
           onSaveShape={handleSaveDesignedShape}
           onClearDesignedGrid={handleClearDesignedGrid}
           onLoadDesignedShape={handleLoadDesignedShape}
+          extraEntries={designerExtraEntries}
+          isDefiningExtraEntry={isDefiningExtraEntry}
+          pendingExtraEntryCellIds={pendingExtraEntryCellIds}
+          onBeginExtraEntryDefinition={handleBeginExtraEntryDefinition}
+          onFinishExtraEntryDefinition={handleFinishExtraEntryDefinition}
+          onCancelExtraEntryDefinition={handleCancelExtraEntryDefinition}
+          onSelectExtraEntry={(entryId) =>
+            setSelectedDesignerExtraEntryId((prev) =>
+              prev === entryId ? null : entryId,
+            )
+          }
+          selectedExtraEntryId={selectedDesignerExtraEntryId}
+          onRemoveExtraEntry={handleRemoveDesignerExtraEntry}
+          describeExtraEntry={describeEntryPath}
         />
       </main>
 
@@ -1609,7 +1880,7 @@ export default function App() {
 
       {isShapeLibraryOpen ? (
         <ShapeLibraryDialog
-          shapes={sessionShapeLibrary}
+          shapes={normalizedSessionShapeLibrary}
           onLoadShape={handleStartFromLibraryShape}
           onClose={() => setIsShapeLibraryOpen(false)}
         />

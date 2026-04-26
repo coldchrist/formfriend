@@ -1,6 +1,8 @@
+import type { EntryPath, ExtraEntryReadingPolicy } from "./entryPath";
+
 export type ShapePrimitive = "." | "S" | "L" | "R" | "l" | "r";
 
-export type ShapeDefinitionKind = "composed" | "explicit";
+export type ShapeDefinitionKind = "composed" | "cellMask" | "explicit";
 
 export interface ComposedShapeLayout {
   width: number;
@@ -10,11 +12,7 @@ export interface ComposedShapeLayout {
   overlapCols: number;
 }
 
-export interface ShapeExtraEntry {
-  id: string;
-  cellIds: string[];
-  label?: string;
-}
+export type ShapeExtraEntry = EntryPath;
 
 export type GridPresentation = "square" | "hex";
 
@@ -23,6 +21,50 @@ export interface ShapeRenderHints {
   gridPresentation?: GridPresentation;
 }
 
+/**
+ * Canonical stored shape definitions.
+ *
+ * These are the source-independent shape records used in saved .shape.json files
+ * and in the built-in standard shape library. Runtime code should normalize one
+ * of these records before it needs parsed layout dimensions or derived cells.
+ */
+export interface CanonicalComposedShapeDefinition {
+  version: 1;
+  kind: "composed";
+  id: string;
+  name: string;
+  layout: string;
+  overlapRows: number;
+  overlapCols: number;
+  subformIdsByMacroCell?: Record<string, string>;
+  extraEntries?: ShapeExtraEntry[];
+  extraEntryReadingPolicy?: ExtraEntryReadingPolicy;
+  renderHints?: ShapeRenderHints;
+}
+
+export interface CanonicalCellMaskShapeDefinition {
+  version: 1;
+  kind: "cellMask";
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  rows: string[];
+  extraEntries?: ShapeExtraEntry[];
+  extraEntryReadingPolicy?: ExtraEntryReadingPolicy;
+  renderHints?: ShapeRenderHints;
+}
+
+export type CanonicalShapeDefinition =
+  | CanonicalComposedShapeDefinition
+  | CanonicalCellMaskShapeDefinition;
+
+/**
+ * Normalized runtime shape definitions.
+ *
+ * These are produced from canonical definitions after parsing/validation and are
+ * consumed by topology, transforms, rendering, and construction code.
+ */
 export interface ComposedShapeDefinition {
   kind: "composed";
   id: string;
@@ -30,6 +72,19 @@ export interface ComposedShapeDefinition {
   layout: ComposedShapeLayout;
   subformIdsByMacroCell?: Record<string, string>;
   extraEntries?: ShapeExtraEntry[];
+  extraEntryReadingPolicy?: ExtraEntryReadingPolicy;
+  renderHints?: ShapeRenderHints;
+}
+
+export interface CellMaskShapeDefinition {
+  kind: "cellMask";
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  rows: string[];
+  extraEntries?: ShapeExtraEntry[];
+  extraEntryReadingPolicy?: ExtraEntryReadingPolicy;
   renderHints?: ShapeRenderHints;
 }
 
@@ -40,7 +95,10 @@ export interface ExplicitShapeDefinition {
   renderHints?: ShapeRenderHints;
 }
 
-export type ShapeDefinition = ComposedShapeDefinition | ExplicitShapeDefinition;
+export type ShapeDefinition =
+  | ComposedShapeDefinition
+  | CellMaskShapeDefinition
+  | ExplicitShapeDefinition;
 
 export function isShapePrimitive(value: string): value is ShapePrimitive {
   return (

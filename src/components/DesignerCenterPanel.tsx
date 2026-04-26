@@ -5,13 +5,19 @@ import { buildTopologyFromComposedShapeDefinition } from "../domain/shapeTopolog
 import { placePrimitiveAtSelection } from "../domain/shapeDesignerState";
 import type { ShapePrimitive } from "../domain/shapeDefinition";
 import type { ShapeDesignerState } from "../domain/shapeDesignerState";
+import type { Topology } from "../domain/types";
 import { isHexPreviewValid } from "../domain/hexPreviewValidation";
 
-type DesignerCenterPanelProps = {
+ type DesignerCenterPanelProps = {
   matchingDesignerLibraryShapeName: string | null;
   shapeDesignerState: ShapeDesignerState;
   safeDesignerPrimitiveSize: number;
   designerGridPresentation: "square" | "hex";
+  topology: Topology;
+  isDefiningExtraEntry: boolean;
+  pendingExtraEntryCellIds: string[];
+  selectedExtraEntryCellIds: string[];
+  onExtraEntryCellClick: (cellId: string) => void;
   onSelectCell: (row: number, col: number) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onPrimitivePlaced: (
@@ -25,6 +31,11 @@ export function DesignerCenterPanel({
   shapeDesignerState,
   safeDesignerPrimitiveSize,
   designerGridPresentation,
+  topology,
+  isDefiningExtraEntry,
+  pendingExtraEntryCellIds,
+  selectedExtraEntryCellIds,
+  onExtraEntryCellClick,
   onSelectCell,
   onKeyDown,
   onPrimitivePlaced,
@@ -38,6 +49,7 @@ export function DesignerCenterPanel({
             id: "preview",
             name: "Preview",
             layout: shapeDesignerState.layout,
+            extraEntries: [],
             renderHints: { gridPresentation: "hex" },
           },
           safeDesignerPrimitiveSize,
@@ -71,6 +83,11 @@ export function DesignerCenterPanel({
             size={safeDesignerPrimitiveSize}
             selection={shapeDesignerState.selection}
             selectedPrimitive={shapeDesignerState.selectedPrimitive}
+            topology={topology}
+            isDefiningExtraEntry={isDefiningExtraEntry}
+            pendingExtraEntryCellIds={pendingExtraEntryCellIds}
+            selectedExtraEntryCellIds={selectedExtraEntryCellIds}
+            onExtraEntryCellClick={onExtraEntryCellClick}
             onSelectCell={onSelectCell}
             onKeyDown={onKeyDown}
           />

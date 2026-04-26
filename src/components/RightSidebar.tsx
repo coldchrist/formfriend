@@ -1,5 +1,6 @@
 import { CluePanel } from "../components/CluePanel";
 import { DesignerNotesPanel } from "../components/DesignerNotesPanel";
+import type { EntryPath } from "../domain/entryPath";
 import type { EntryRef } from "../domain/types";
 
 type RightSidebarProps = {
@@ -10,6 +11,7 @@ type RightSidebarProps = {
   singleClueEntries: EntryRef[];
   displayedAcrossEntries: EntryRef[];
   displayedDownEntries: EntryRef[];
+  displayedExtraEntries: EntryRef[];
   cluesByEntryId: Record<string, string>;
   activeClueEntryId?: string;
   activeEntry?: EntryRef;
@@ -20,12 +22,21 @@ type RightSidebarProps = {
   ) => void;
   onClueChange: (entryId: string, text: string) => void;
   // Designer actions (only used when isDesigner)
-  // Designer actions (only used when isDesigner)
   onConstruct: () => void;
   onStartFromShape: () => void;
   onSaveShape: () => void;
   onClearDesignedGrid: () => void;
   onLoadDesignedShape: (file: File) => void | Promise<void>;
+  extraEntries: EntryPath[];
+  isDefiningExtraEntry: boolean;
+  pendingExtraEntryCellIds: string[];
+  onBeginExtraEntryDefinition: () => void;
+  onFinishExtraEntryDefinition: () => void;
+  onCancelExtraEntryDefinition: () => void;
+  onRemoveExtraEntry: (id: string) => void;
+  onSelectExtraEntry: (entryId: string) => void;
+  selectedExtraEntryId: string | null;
+  describeExtraEntry: (entry: EntryPath) => string;
 };
 
 export function RightSidebar({
@@ -36,6 +47,7 @@ export function RightSidebar({
   singleClueEntries,
   displayedAcrossEntries,
   displayedDownEntries,
+  displayedExtraEntries,
   cluesByEntryId,
   activeClueEntryId,
   activeEntry,
@@ -47,6 +59,16 @@ export function RightSidebar({
   onSaveShape,
   onClearDesignedGrid,
   onLoadDesignedShape,
+  extraEntries,
+  isDefiningExtraEntry,
+  pendingExtraEntryCellIds,
+  onBeginExtraEntryDefinition,
+  onFinishExtraEntryDefinition,
+  onCancelExtraEntryDefinition,
+  onRemoveExtraEntry,
+  onSelectExtraEntry,
+  selectedExtraEntryId,
+  describeExtraEntry,
 }: RightSidebarProps) {
   return (
     <aside
@@ -67,6 +89,16 @@ export function RightSidebar({
           onSaveShape={onSaveShape}
           onClearGrid={onClearDesignedGrid}
           onLoadShape={onLoadDesignedShape}
+          extraEntries={extraEntries}
+          isDefiningExtraEntry={isDefiningExtraEntry}
+          pendingExtraEntryCellIds={pendingExtraEntryCellIds}
+          onBeginExtraEntryDefinition={onBeginExtraEntryDefinition}
+          onFinishExtraEntryDefinition={onFinishExtraEntryDefinition}
+          onCancelExtraEntryDefinition={onCancelExtraEntryDefinition}
+          onRemoveExtraEntry={onRemoveExtraEntry}
+          describeExtraEntry={describeExtraEntry}
+          onSelectExtraEntry={onSelectExtraEntry}
+          selectedExtraEntryId={selectedExtraEntryId}
         />
       ) : currentFormStyle === "single" ? (
         <CluePanel
@@ -107,6 +139,21 @@ export function RightSidebar({
             onEntryKeyDown={onEntryKeyDown}
             onClueChange={onClueChange}
           />
+
+          {displayedExtraEntries.length > 0 ? (
+            <CluePanel
+              title="Extra"
+              entries={displayedExtraEntries}
+              cluesByEntryId={cluesByEntryId}
+              activeEntryId={
+                activeEntry?.direction === "extra" ? activeEntry.id : undefined
+              }
+              readOnly={isSolve}
+              onEntryClick={onEntryClick}
+              onEntryKeyDown={onEntryKeyDown}
+              onClueChange={onClueChange}
+            />
+          ) : null}
         </>
       )}
     </aside>

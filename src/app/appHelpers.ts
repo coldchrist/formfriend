@@ -176,6 +176,19 @@ export function buildDoublePresentationNumbering(topology: Topology): {
     }
   });
 
+  const extraEntries = topology.entries
+    .filter((e) => e.direction === "extra")
+    .sort((a, b) => {
+      const ca = cellById.get(a.cells[0] ?? "");
+      const cb = cellById.get(b.cells[0] ?? "");
+      if (!ca || !cb) return 0;
+      return compareCellsReadingOrder(ca, cb);
+    });
+
+  extraEntries.forEach((entry, i) => {
+    numberByEntryId[entry.id] = i + 1;
+  });
+
   // clueNumberByCellId is kept for compatibility but unused for double forms
   // (numbers are now rendered outside the grid via acrossLabelByCellId / downLabelByCellId)
   for (const entry of acrossEntries) {
@@ -281,7 +294,9 @@ export function relabelEntry(
     number,
     label: single
       ? String(number)
-      : `${number}${entry.direction === "across" ? "A" : "D"}`,
+      : entry.direction === "extra"
+        ? `X${number}`
+        : `${number}${entry.direction === "across" ? "A" : "D"}`,
   };
 }
 
@@ -324,7 +339,8 @@ export function resolveFormStyleForTopology(
   topology: Topology,
 ): FormStyle {
   if (requestedFormStyle === "single") {
-    return isTopologyReflectableAcrossLeadingDiagonal(topology)
+    return !topology.entries.some((entry) => entry.direction === "extra") &&
+      isTopologyReflectableAcrossLeadingDiagonal(topology)
       ? "single"
       : "double";
   }

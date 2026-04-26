@@ -1,12 +1,12 @@
 import { DesignerSidebar } from "../components/DesignerSidebar";
 import { Toolbar } from "../components/Toolbar";
 import type { AppMode, ShapeVariant } from "../domain/types";
-import type { ComposedShapeDefinition } from "../domain/shapeDefinition";
+import type { ShapeDefinition } from "../domain/shapeDefinition";
 
 type LeftSidebarProps = {
   isDesigner: boolean;
   shapeDisplayName?: string;
-  sessionShapeLibrary: ComposedShapeDefinition[];
+  sessionShapeLibrary: ShapeDefinition[];
   selectedLibraryShapeId: string | null;
   isConstruct: boolean;
   currentSize: number;
@@ -23,7 +23,7 @@ type LeftSidebarProps = {
   safeDesignerPrimitiveSize: number;
   minimumDesignerPrimitiveSize: number;
   designerGridPresentation: "square" | "hex";
-  onInstantiateLibraryShape: (definition: ComposedShapeDefinition) => void;
+  onInstantiateLibraryShape: (definition: ShapeDefinition) => void;
   onNewPuzzle: (size: number) => void;
   onSave: () => void;
   onLoad: (file: File) => void | Promise<void>;

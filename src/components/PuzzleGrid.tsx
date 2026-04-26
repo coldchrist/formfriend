@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
-import type { EntryRef, SelectionState, Topology } from "../domain/types";
+import type { Cell, EntryRef, SelectionState, Topology } from "../domain/types";
 
 export type PuzzleGridHandle = {
   focusGrid: () => void;
@@ -22,6 +22,29 @@ type PuzzleGridProps = {
 
 const DEFAULT_CELL_SIZE = 32;
 const PADDING = 16;
+
+type ExtraLabel = {
+  entry: EntryRef;
+  firstCell: Cell;
+  offsetRow: number;
+  offsetCol: number;
+  distance: number;
+};
+
+function signOffset(value: number): number {
+  if (value < 0) return -1;
+  if (value > 0) return 1;
+  return 0;
+}
+
+function makeLabelSlotKey(
+  cellId: string,
+  offsetRow: number,
+  offsetCol: number,
+  distance: number,
+): string {
+  return `${cellId}:${offsetRow}:${offsetCol}:${distance}`;
+}
 
 export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
   function PuzzleGrid(
@@ -120,6 +143,12 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
       topology.cells.map((cell) => [cell.id, getCellX(cell)]),
     );
 
+    const cellById = new Map(topology.cells.map((cell) => [cell.id, cell]));
+
+    function getCellY(cell: Cell): number {
+      return PADDING + LABEL_SPACE + cell.row * cellSize;
+    }
+
     const hexDownLabelSide: "left" | "right" | "center" = (() => {
       if (!isHex) {
         return "center";
@@ -150,6 +179,68 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
 
       return "center";
     })();
+
+    const occupiedLabelSlots = new Set<string>();
+
+    for (const cellId of Object.keys(acrossLabelByCellId)) {
+      occupiedLabelSlots.add(makeLabelSlotKey(cellId, 0, -1, 1));
+    }
+
+    for (const cellId of Object.keys(downLabelByCellId)) {
+      const downOffset =
+        hexDownLabelSide === "left"
+          ? { row: -1, col: -1 }
+          : hexDownLabelSide === "right"
+            ? { row: -1, col: 1 }
+            : { row: -1, col: 0 };
+
+      occupiedLabelSlots.add(
+        makeLabelSlotKey(cellId, downOffset.row, downOffset.col, 1),
+      );
+    }
+
+    const extraLabels: ExtraLabel[] = [];
+
+    for (const entry of topology.entries) {
+      if (entry.direction !== "extra" || entry.cells.length < 2) {
+        continue;
+      }
+
+      const firstCell = cellById.get(entry.cells[0]);
+      const secondCell = cellById.get(entry.cells[1]);
+
+      if (!firstCell || !secondCell) {
+        continue;
+      }
+
+      const offsetRow = -signOffset(secondCell.row - firstCell.row);
+      const offsetCol = -signOffset(secondCell.col - firstCell.col);
+
+      if (offsetRow === 0 && offsetCol === 0) {
+        continue;
+      }
+
+      let distance = 1;
+      while (
+        occupiedLabelSlots.has(
+          makeLabelSlotKey(firstCell.id, offsetRow, offsetCol, distance),
+        )
+      ) {
+        distance += 1;
+      }
+
+      occupiedLabelSlots.add(
+        makeLabelSlotKey(firstCell.id, offsetRow, offsetCol, distance),
+      );
+
+      extraLabels.push({
+        entry,
+        firstCell,
+        offsetRow,
+        offsetCol,
+        distance,
+      });
+    }
 
     const activeCellIdSet = new Set(activeCellIds);
 
@@ -250,6 +341,50 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
             </g>
           );
         })}
+
+        {extraLabels.map(
+          ({ entry, firstCell, offsetRow, offsetCol, distance }) => {
+            const x = cellXById.get(firstCell.id);
+            if (x === undefined) return null;
+
+            const y = getCellY(firstCell);
+            const fontSize = Math.max(8, Math.floor(cellSize * 0.3125));
+            const step = Math.max(10, fontSize + 4);
+            const extraDistance = distance - 1;
+
+            const labelX =
+              offsetCol < 0
+                ? x - 3 - extraDistance * step
+                : offsetCol > 0
+                  ? x + cellSize + 3 + extraDistance * step
+                  : x + cellSize / 2;
+
+            const labelY =
+              offsetRow < 0
+                ? y - 3 - extraDistance * step
+                : offsetRow > 0
+                  ? y + cellSize + fontSize + extraDistance * step
+                  : y + cellSize / 2 + 4;
+
+            const textAnchor =
+              offsetCol < 0 ? "end" : offsetCol > 0 ? "start" : "middle";
+
+            return (
+              <text
+                key={`extra-label-${entry.id}`}
+                x={labelX}
+                y={labelY}
+                textAnchor={textAnchor}
+                fontSize={fontSize}
+                fontFamily="Arial, sans-serif"
+                fontWeight={700}
+                fill="#b45309"
+              >
+                {entry.label}
+              </text>
+            );
+          },
+        )}
       </svg>
     );
   },

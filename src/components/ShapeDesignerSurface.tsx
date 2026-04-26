@@ -4,6 +4,7 @@ import type {
   ComposedShapeLayout,
   ShapePrimitive,
 } from "../domain/shapeDefinition";
+import type { Topology } from "../domain/types";
 import { buildOccupiedCellsFromComposedLayout } from "../domain/shapeComposition";
 import { getPrimitiveAt } from "../domain/shapeLayout";
 
@@ -12,6 +13,11 @@ type ShapeDesignerSurfaceProps = {
   size: number;
   selection: { row: number; col: number };
   selectedPrimitive: ShapePrimitive;
+  topology: Topology;
+  isDefiningExtraEntry: boolean;
+  pendingExtraEntryCellIds: string[];
+  selectedExtraEntryCellIds: string[];
+  onExtraEntryCellClick: (cellId: string) => void;
   onSelectCell: (row: number, col: number) => void;
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 };
@@ -40,6 +46,11 @@ export function ShapeDesignerSurface({
   size,
   selection,
   selectedPrimitive,
+  topology,
+  isDefiningExtraEntry,
+  pendingExtraEntryCellIds,
+  selectedExtraEntryCellIds,
+  onExtraEntryCellClick,
   onSelectCell,
   onKeyDown,
 }: ShapeDesignerSurfaceProps) {
@@ -64,7 +75,12 @@ export function ShapeDesignerSurface({
   const occupiedSet = new Set(
     occupiedCells.map((cell) => `${cell.row},${cell.col}`),
   );
-
+  const pendingExtraEntryCellIdSet = new Set(pendingExtraEntryCellIds);
+  const selectedExtraEntryCellIdSet = new Set(selectedExtraEntryCellIds);
+  const cellIdByCoord = new Map(
+    topology.cells.map((cell) => [`${cell.row},${cell.col}`, cell.id]),
+  );
+  const cellById = new Map(topology.cells.map((cell) => [cell.id, cell]));
   return (
     <section
       className="clue-panel"
@@ -94,10 +110,18 @@ export function ShapeDesignerSurface({
         }}
       >
         <div style={{ marginBottom: "0.5rem", fontSize: "0.9rem" }}>
-          Selected tool:{" "}
-          <strong>
-            {selectedPrimitive === "." ? "Erase" : selectedPrimitive}
-          </strong>
+          {isDefiningExtraEntry ? (
+            <span>
+              Defining extra word: click occupied cells in reading order.
+            </span>
+          ) : (
+            <span>
+              Selected tool:{" "}
+              <strong>
+                {selectedPrimitive === "." ? "Erase" : selectedPrimitive}
+              </strong>
+            </span>
+          )}
         </div>
 
         <div
@@ -123,6 +147,13 @@ export function ShapeDesignerSurface({
               const [rowText, colText] = key.split(",");
               const row = Number(rowText);
               const col = Number(colText);
+              const cellId = cellIdByCoord.get(key);
+              const isPendingExtraCell = Boolean(
+                cellId && pendingExtraEntryCellIdSet.has(cellId),
+              );
+              const isSelectedExtraCell = Boolean(
+                cellId && selectedExtraEntryCellIdSet.has(cellId),
+              );
 
               return (
                 <rect
@@ -131,9 +162,30 @@ export function ShapeDesignerSurface({
                   y={row * ELEMENT_CELL_PX}
                   width={ELEMENT_CELL_PX}
                   height={ELEMENT_CELL_PX}
-                  fill="#e2e8f0"
-                  stroke="#94a3b8"
-                  strokeWidth={1}
+                  fill={
+                    isPendingExtraCell
+                      ? "#fde68a"
+                      : isSelectedExtraCell
+                        ? "#fef08a"
+                        : "#e2e8f0"
+                  }
+                  stroke={
+                    isPendingExtraCell || isSelectedExtraCell
+                      ? "#d97706"
+                      : "#94a3b8"
+                  }
+                  strokeWidth={
+                    isPendingExtraCell || isSelectedExtraCell ? 2 : 1
+                  }
+                  onClick={() => {
+                    if (isDefiningExtraEntry && cellId) {
+                      onExtraEntryCellClick(cellId);
+                      containerRef.current?.focus();
+                    }
+                  }}
+                  style={{
+                    cursor: isDefiningExtraEntry ? "crosshair" : "default",
+                  }}
                 />
               );
             })}
@@ -160,6 +212,7 @@ export function ShapeDesignerSurface({
                       stroke={isSelected ? "#2563eb" : "#94a3b8"}
                       strokeDasharray={isSelected ? undefined : "6 4"}
                       strokeWidth={isSelected ? 2 : 1}
+                      pointerEvents={isDefiningExtraEntry ? "none" : undefined}
                       onClick={() => {
                         onSelectCell(macroRow, macroCol);
                         containerRef.current?.focus();
@@ -181,6 +234,43 @@ export function ShapeDesignerSurface({
                 );
               }),
             )}
+
+            {/* Extra-entry highlight overlay. Drawn last so it remains visible above macro-cell outlines. */}
+            {Array.from(selectedExtraEntryCellIdSet).map((cellId) => {
+              const cell = cellById.get(cellId);
+              if (!cell) return null;
+              return (
+                <rect
+                  key={`selected-extra-${cellId}`}
+                  x={cell.col * ELEMENT_CELL_PX}
+                  y={cell.row * ELEMENT_CELL_PX}
+                  width={ELEMENT_CELL_PX}
+                  height={ELEMENT_CELL_PX}
+                  fill="rgba(250, 204, 21, 0.72)"
+                  stroke="#ca8a04"
+                  strokeWidth={2}
+                  pointerEvents="none"
+                />
+              );
+            })}
+
+            {Array.from(pendingExtraEntryCellIdSet).map((cellId) => {
+              const cell = cellById.get(cellId);
+              if (!cell) return null;
+              return (
+                <rect
+                  key={`pending-extra-${cellId}`}
+                  x={cell.col * ELEMENT_CELL_PX}
+                  y={cell.row * ELEMENT_CELL_PX}
+                  width={ELEMENT_CELL_PX}
+                  height={ELEMENT_CELL_PX}
+                  fill="rgba(251, 191, 36, 0.82)"
+                  stroke="#d97706"
+                  strokeWidth={2}
+                  pointerEvents="none"
+                />
+              );
+            })}
           </svg>
         </div>
 

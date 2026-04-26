@@ -151,20 +151,31 @@ function validateSavedPuzzle(puzzle: Partial<SavedPuzzle>): void {
   if (parsedVersion !== 1 && parsedVersion !== 2) {
     throw new Error(`Unsupported puzzle version: ${String(parsedVersion)}`);
   }
-
-  if (!puzzle.spec || puzzle.spec.shapeFamily !== "composed") {
-    throw new Error("Only composed-shape puzzles are currently supported.");
+  if (!puzzle.spec || (puzzle.spec.shapeFamily !== "composed" && puzzle.spec.shapeFamily !== "cellMask")) {
+    throw new Error("Only composed-shape and cell-mask puzzles are currently supported.");
   }
 
-  if (
-    typeof puzzle.spec.composedLayout !== "string" ||
-    puzzle.spec.composedLayout.trim() === ""
-  ) {
-    throw new Error("Puzzle file is missing composedLayout.");
+  if (puzzle.spec.shapeFamily === "composed") {
+    if (
+      typeof puzzle.spec.composedLayout !== "string" ||
+      puzzle.spec.composedLayout.trim() === ""
+    ) {
+      throw new Error("Puzzle file is missing composedLayout.");
+    }
+
+    if (!Number.isInteger(puzzle.spec.size) || puzzle.spec.size < 2) {
+      throw new Error("Puzzle file has an invalid size.");
+    }
   }
 
-  if (!Number.isInteger(puzzle.spec.size) || puzzle.spec.size < 2) {
-    throw new Error("Puzzle file has an invalid size.");
+  if (puzzle.spec.shapeFamily === "cellMask") {
+    if (
+      !Array.isArray(puzzle.spec.cellMaskRows) ||
+      !Number.isInteger(puzzle.spec.cellMaskWidth) ||
+      !Number.isInteger(puzzle.spec.cellMaskHeight)
+    ) {
+      throw new Error("Puzzle file has an invalid cell mask shape spec.");
+    }
   }
 
   if (

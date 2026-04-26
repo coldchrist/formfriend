@@ -69,13 +69,6 @@ export function SolveToolbar({
   onModeChange,
   onConstructFromForm,
 }: SolveToolbarProps) {
-  console.log("[CHECK BUTTON TEST SolveToolbar]", {
-    isSolveCheckable,
-    hasSolution,
-    isSolutionCorrect,
-    hasOnCheck: typeof onCheck === "function",
-    loadedPuzzleFileName,
-  });
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 

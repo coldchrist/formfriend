@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { PuzzleGrid, type PuzzleGridHandle } from "../components/PuzzleGrid";
-import type { FormStyle, ShapeVariant } from "../domain/types";
+import type { FormStyle, ShapeVariant, SelectionState } from "../domain/types";
 
 type PuzzleCenterPanelProps = {
   gridRef: React.RefObject<PuzzleGridHandle | null>;
@@ -31,10 +31,7 @@ type PuzzleCenterPanelProps = {
     author: string;
   };
   projectedFillsByCellId: Record<string, string>;
-  selection: {
-    cellId: string | null;
-    direction: "across" | "down";
-  };
+  selection: SelectionState;
   activeGridCellIds: string[];
   clueNumberByCellId: Record<string, string>;
   acrossLabelByCellId?: Record<string, string>;

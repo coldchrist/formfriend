@@ -246,7 +246,10 @@ export function buildFormModelFromTopology(
 ): FormModel {
   const formStyle = spec.formStyle ?? "double";
 
-  if (formStyle === "single") {
+  if (
+    formStyle === "single" &&
+    !topology.entries.some((entry) => entry.direction === "extra")
+  ) {
     return buildSingleFormModel(spec, topology);
   }
 

@@ -30,6 +30,7 @@ type UseNavigationActionsArgs = {
   downEntries: EntryRef[];
   displayedAcrossEntries: EntryRef[];
   displayedDownEntries: EntryRef[];
+  displayedExtraEntries: EntryRef[];
   singleClueEntries: EntryRef[];
   currentFormStyle: FormStyle;
 };
@@ -45,6 +46,7 @@ export function useNavigationActions({
   downEntries,
   displayedAcrossEntries,
   displayedDownEntries,
+  displayedExtraEntries,
   singleClueEntries,
   currentFormStyle,
 }: UseNavigationActionsArgs) {
@@ -54,6 +56,7 @@ export function useNavigationActions({
       selection: {
         cellId: entry.cells[0] ?? null,
         direction: entry.direction,
+        entryId: entry.id,
       },
     }));
   }
@@ -72,7 +75,11 @@ export function useNavigationActions({
     }
 
     const entries =
-      activeEntry.direction === "across" ? acrossEntries : downEntries;
+      activeEntry.direction === "across"
+        ? acrossEntries
+        : activeEntry.direction === "down"
+          ? downEntries
+          : displayedExtraEntries;
     const index = getEntryIndex(entries, activeEntry.id);
     const nextEntry = getWrappedEntry(entries, index, step);
     if (!nextEntry) {
@@ -117,6 +124,7 @@ export function useNavigationActions({
           selection: {
             cellId: nextCell.id,
             direction,
+            entryId: undefined,
           },
         };
       }
@@ -142,6 +150,7 @@ export function useNavigationActions({
         selection: {
           cellId: nextCell.id,
           direction,
+          entryId: undefined,
         },
       };
     });
@@ -198,6 +207,7 @@ export function useNavigationActions({
           prev.topology,
           prev.selection.cellId,
           prev.selection.direction,
+          prev.selection.entryId,
         );
         if (!entry) {
           return prev;
@@ -246,6 +256,7 @@ export function useNavigationActions({
           prev.topology,
           prev.selection.cellId,
           prev.selection.direction,
+          prev.selection.entryId,
         );
         if (!entry) {
           return prev;
@@ -314,7 +325,7 @@ export function useNavigationActions({
     const entries =
       currentFormStyle === "single"
         ? singleClueEntries
-        : [...displayedAcrossEntries, ...displayedDownEntries];
+        : [...displayedAcrossEntries, ...displayedDownEntries, ...displayedExtraEntries];
 
     if (event.key === "Tab") {
       event.preventDefault();

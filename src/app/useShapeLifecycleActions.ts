@@ -4,15 +4,20 @@ import {
   buildEmptyFormFillState,
   buildFormModelFromTopology,
 } from "../domain/formModel";
-import { buildPuzzleSpecFromComposedShapeDefinition } from "../domain/shapeInstantiation";
+import { buildPuzzleSpecFromShapeDefinition } from "../domain/shapeInstantiation";
 import {
-  applyVariantSelection,
   supportsInversion,
   supportsLeftRightVariant,
+  transformComposedShapeDefinitionForVariant,
   type ShapeOrientation,
 } from "../domain/shapeTransforms";
-import type { ComposedShapeDefinition } from "../domain/shapeDefinition";
+import type {
+  CanonicalShapeDefinition,
+  ShapeDefinition,
+} from "../domain/shapeDefinition";
+import { canonicalizeShapeDefinition } from "../domain/shapeSerialization";
 import type { FormStyle, ShapeVariant } from "../domain/types";
+import { DEFAULT_EXTRA_ENTRY_READING_POLICY } from "../domain/entryPath";
 import type { PuzzleStoreState } from "../state/puzzleStore";
 import { getTodayString, resolveFormStyleForTopology } from "./appHelpers";
 
@@ -26,7 +31,7 @@ type UiStatusSetter = (
 type UseShapeLifecycleActionsArgs = {
   store: PuzzleStoreState;
   setStore: SetState<PuzzleStoreState>;
-  activeShapeDefinition: ComposedShapeDefinition | null;
+  activeShapeDefinition: ShapeDefinition | null;
   currentShapeVariant: ShapeVariant;
   currentFormStyle: FormStyle;
   currentInverted: boolean;
@@ -34,9 +39,9 @@ type UseShapeLifecycleActionsArgs = {
   currentShapeSupportsLeftRight: boolean;
   allowedSizes: number[];
   canBeSingle: boolean;
-  sessionShapeLibrary: ComposedShapeDefinition[];
+  sessionShapeLibrary: CanonicalShapeDefinition[];
   setSelectedLibraryShapeId: SetState<string | null>;
-  setSessionShapeLibrary: SetState<ComposedShapeDefinition[]>;
+  setSessionShapeLibrary: SetState<CanonicalShapeDefinition[]>;
   setCurrentPuzzleDateAdded: SetState<string>;
   setCurrentPuzzleComment: SetState<string>;
   setCurrentPuzzleEnigmaIssue: SetState<string>;
@@ -74,8 +79,27 @@ export function useShapeLifecycleActions({
   void sessionShapeLibrary;
   void currentShapeSupportsLeftRight;
 
+  function transformDefinitionForPlacement(
+    definition: ShapeDefinition,
+    size: number,
+    orientation: ShapeOrientation,
+    inverted: boolean,
+  ): ShapeDefinition {
+    if (definition.kind !== "composed") {
+      return definition;
+    }
+
+    return transformComposedShapeDefinitionForVariant(
+      definition,
+      size,
+      orientation,
+      inverted,
+      definition.extraEntryReadingPolicy ?? DEFAULT_EXTRA_ENTRY_READING_POLICY,
+    );
+  }
+
   function instantiateComposedShape(
-    definition: ComposedShapeDefinition,
+    definition: ShapeDefinition,
     options?: {
       size?: number;
       orientation?: ShapeOrientation;
@@ -88,13 +112,14 @@ export function useShapeLifecycleActions({
     const orientation = options?.orientation ?? "left";
     const inverted = options?.inverted ?? false;
     const requestedFormStyle = options?.requestedFormStyle ?? currentFormStyle;
+    const transformedDefinition = transformDefinitionForPlacement(
+      definition,
+      size,
+      orientation,
+      inverted,
+    );
 
-    const transformedDefinition: ComposedShapeDefinition = {
-      ...definition,
-      layout: applyVariantSelection(definition.layout, orientation, inverted),
-    };
-
-    const requestedSpec = buildPuzzleSpecFromComposedShapeDefinition(
+    const requestedSpec = buildPuzzleSpecFromShapeDefinition(
       transformedDefinition,
       size,
       requestedFormStyle,
@@ -159,20 +184,22 @@ export function useShapeLifecycleActions({
     }
   }
 
-  function upsertSessionShape(definition: ComposedShapeDefinition) {
+  function upsertSessionShape(definition: ShapeDefinition) {
+    const canonical = canonicalizeShapeDefinition(definition);
+
     setSessionShapeLibrary((prev) => {
-      const existingIndex = prev.findIndex((item) => item.id === definition.id);
+      const existingIndex = prev.findIndex((item) => item.id === canonical.id);
 
       if (existingIndex < 0) {
-        return [...prev, definition];
+        return [...prev, canonical];
       }
 
       const next = [...prev];
-      next[existingIndex] = definition;
+      next[existingIndex] = canonical;
       return next;
     });
 
-    setSelectedLibraryShapeId(definition.id);
+    setSelectedLibraryShapeId(canonical.id);
   }
 
   function handleSizeChange(size: number) {
@@ -301,32 +328,38 @@ export function useShapeLifecycleActions({
   }
 
   function instantiateLibraryShapeFromSelection(
-    definition: ComposedShapeDefinition,
+    definition: ShapeDefinition,
   ) {
     try {
-      // Ensure size meets the minimum for this shape's overlap requirements
       const minSize =
-        Math.max(
-          definition.layout.overlapRows ?? 1,
-          definition.layout.overlapCols ?? 1,
-        ) + 1;
+        definition.kind === "composed"
+          ? Math.max(
+              definition.layout.overlapRows ?? 1,
+              definition.layout.overlapCols ?? 1,
+            ) + 1
+          : store.spec.size;
       const size = Math.max(store.spec.size, minSize);
+
+      const supportsOrientation =
+        definition.kind === "composed" &&
+        supportsLeftRightVariant(
+          definition.layout,
+          definition.renderHints?.gridPresentation ?? "square",
+        );
+      const supportsVerticalInversion =
+        definition.kind === "composed" &&
+        supportsInversion(
+          definition.layout,
+          definition.renderHints?.gridPresentation ?? "square",
+        );
 
       instantiateComposedShape(definition, {
         size,
         orientation:
-          supportsLeftRightVariant(
-            definition.layout,
-            definition.renderHints?.gridPresentation ?? "square",
-          ) && currentShapeVariant === "right"
+          supportsOrientation && currentShapeVariant === "right"
             ? "right"
             : "left",
-        inverted: supportsInversion(
-          definition.layout,
-          definition.renderHints?.gridPresentation ?? "square",
-        )
-          ? currentInverted
-          : false,
+        inverted: supportsVerticalInversion ? currentInverted : false,
         requestedFormStyle: currentFormStyle,
         uiMessage: `Using shape: ${definition.name}`,
       });

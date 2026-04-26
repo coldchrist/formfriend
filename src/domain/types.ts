@@ -1,6 +1,6 @@
-export type ShapeFamily = "composed";
+export type ShapeFamily = "composed" | "cellMask";
 export type ShapeVariant = "left" | "right";
-export type EntryDirection = "across" | "down";
+export type EntryDirection = "across" | "down" | "extra";
 export type AppMode =
   | "construct"
   | "solve_strict"
@@ -17,6 +17,10 @@ export interface PuzzleSpec {
   composedLayout?: string;
   overlapRows?: number;
   overlapCols?: number;
+  cellMaskRows?: string[];
+  cellMaskWidth?: number;
+  cellMaskHeight?: number;
+  extraEntries?: import("./entryPath").EntryPath[];
   shapeId?: string;
   shapeName?: string;
 }
@@ -67,6 +71,7 @@ export interface SolutionState extends FormFillState {}
 export interface SelectionState {
   cellId: string | null;
   direction: EntryDirection;
+  entryId?: string;
 }
 
 export interface WorkspacePuzzleData {

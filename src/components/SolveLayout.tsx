@@ -1,7 +1,7 @@
 import { CluePanel } from "./CluePanel";
 import { SolveToolbar } from "./SolveToolbar";
 import { PuzzleGrid, type PuzzleGridHandle } from "./PuzzleGrid";
-import type { AppMode, EntryRef } from "../domain/types";
+import type { AppMode, EntryRef, SelectionState } from "../domain/types";
 
 type SolveLayoutProps = {
   gridRef: React.RefObject<PuzzleGridHandle | null>;
@@ -20,7 +20,7 @@ type SolveLayoutProps = {
 
   // Grid
   projectedFillsByCellId: Record<string, string>;
-  selection: { cellId: string | null; direction: "across" | "down" };
+  selection: SelectionState;
   activeGridCellIds: string[];
   clueNumberByCellId: Record<string, string>;
   acrossLabelByCellId?: Record<string, string>;
@@ -33,6 +33,7 @@ type SolveLayoutProps = {
   singleClueEntries: EntryRef[];
   displayedAcrossEntries: EntryRef[];
   displayedDownEntries: EntryRef[];
+  displayedExtraEntries: EntryRef[];
   cluesByEntryId: Record<string, string>;
   activeClueEntryId?: string;
   activeEntry?: EntryRef;
@@ -108,6 +109,7 @@ export function SolveLayout({
   singleClueEntries,
   displayedAcrossEntries,
   displayedDownEntries,
+  displayedExtraEntries,
   cluesByEntryId,
   activeClueEntryId,
   activeEntry,
@@ -123,12 +125,6 @@ export function SolveLayout({
   onEntryClick,
   onEntryKeyDown,
 }: SolveLayoutProps) {
-  console.log("[CHECK BUTTON TEST SolveLayout]", {
-    isSolveCheckable,
-    hasSolution,
-    title,
-    loadedPuzzleFileName,
-  });
 
   const metadataLine = buildMetadataLine(
     author,
@@ -224,6 +220,21 @@ export function SolveLayout({
               onEntryKeyDown={onEntryKeyDown}
               onClueChange={() => {}}
             />
+            {displayedExtraEntries.length > 0 ? (
+              <CluePanel
+                title="Extra"
+                entries={displayedExtraEntries}
+                cluesByEntryId={cluesByEntryId}
+                activeEntryId={
+                  activeEntry?.direction === "extra" ? activeEntry.id : undefined
+                }
+                readOnly
+                fillAvailableHeight
+                onEntryClick={onEntryClick}
+                onEntryKeyDown={onEntryKeyDown}
+                onClueChange={() => {}}
+              />
+            ) : null}
           </>
         )}
       </div>

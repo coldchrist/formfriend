@@ -9,7 +9,10 @@ import type {
   Topology,
 } from "./types";
 import { parseSerializedLayout } from "./shapeLayout";
-import { buildTopologyFromComposedShapeDefinition } from "./shapeTopology";
+import {
+  buildTopologyFromCellMaskShapeDefinition,
+  buildTopologyFromComposedShapeDefinition,
+} from "./shapeTopology";
 
 function cellId(row: number, col: number): string {
   return `r${row}c${col}`;
@@ -159,17 +162,48 @@ export function buildComposedShapeTopology(spec: PuzzleSpec): Topology {
           .replace(/[^a-z0-9]+/g, "-") || "composed-shape",
       name: spec.shapeName?.trim() || "Composed Shape",
       layout,
+      extraEntries: spec.extraEntries,
     },
     size,
   );
 }
 
-export function buildTopology(spec: PuzzleSpec): Topology {
-  if (spec.shapeFamily !== "composed") {
-    throw new Error(`Unsupported shape family: ${spec.shapeFamily}`);
+export function buildCellMaskTopology(spec: PuzzleSpec): Topology {
+  if (spec.shapeFamily !== "cellMask") {
+    throw new Error(
+      `Unsupported shape family for cell mask builder: ${spec.shapeFamily}`,
+    );
   }
 
-  return buildComposedShapeTopology(spec);
+  if (!spec.cellMaskRows || !spec.cellMaskWidth || !spec.cellMaskHeight) {
+    throw new Error("Cell mask shape spec is missing rows or dimensions.");
+  }
+
+  return buildTopologyFromCellMaskShapeDefinition({
+    kind: "cellMask",
+    id:
+      spec.shapeName
+        ?.trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-") || "cell-mask-shape",
+    name: spec.shapeName?.trim() || "Cell Mask Shape",
+    width: spec.cellMaskWidth,
+    height: spec.cellMaskHeight,
+    rows: spec.cellMaskRows,
+    extraEntries: spec.extraEntries,
+  });
+}
+
+export function buildTopology(spec: PuzzleSpec): Topology {
+  if (spec.shapeFamily === "composed") {
+    return buildComposedShapeTopology(spec);
+  }
+
+  if (spec.shapeFamily === "cellMask") {
+    return buildCellMaskTopology(spec);
+  }
+
+  throw new Error(`Unsupported shape family: ${spec.shapeFamily}`);
 }
 
 export function buildEmptyContent(

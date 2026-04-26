@@ -3,8 +3,8 @@ import {
   buildEmptyFormFillState,
   buildFormModelFromTopology,
 } from "../domain/formModel";
-import type { ComposedShapeDefinition } from "../domain/shapeDefinition";
-import { buildPuzzleSpecFromComposedShapeDefinition } from "../domain/shapeInstantiation";
+import type { ShapeDefinition } from "../domain/shapeDefinition";
+import { buildPuzzleSpecFromShapeDefinition } from "../domain/shapeInstantiation";
 import {
   DEFAULT_STANDARD_SHAPE_ID,
   getStandardShapeById,
@@ -34,7 +34,7 @@ export interface PuzzleStoreState {
   selection: SelectionState;
 }
 
-function getDefaultShapeDefinition(): ComposedShapeDefinition {
+function getDefaultShapeDefinition(): ShapeDefinition {
   const definition = getStandardShapeById(DEFAULT_STANDARD_SHAPE_ID);
   if (!definition) {
     throw new Error("Missing default standard shape definition.");
@@ -44,12 +44,12 @@ function getDefaultShapeDefinition(): ComposedShapeDefinition {
 
 export function createInitialPuzzleStore(
   size = 5,
-  definition: ComposedShapeDefinition = getDefaultShapeDefinition(),
+  definition: ShapeDefinition = getDefaultShapeDefinition(),
   shapeVariant: ShapeVariant = "left",
   formStyle: FormStyle = "double",
 ): PuzzleStoreState {
   const spec: PuzzleSpec = {
-    ...buildPuzzleSpecFromComposedShapeDefinition(definition, size, formStyle),
+    ...buildPuzzleSpecFromShapeDefinition(definition, size, formStyle),
     shapeVariant: shapeVariant === "right" ? "right" : "left",
     inverted: false,
   };
@@ -72,7 +72,7 @@ export function createInitialPuzzleStore(
 
 export function createInitialConstructWorkspace(
   size = 5,
-  definition: ComposedShapeDefinition = getDefaultShapeDefinition(),
+  definition: ShapeDefinition = getDefaultShapeDefinition(),
   shapeVariant: ShapeVariant = "left",
   formStyle: FormStyle = "double",
 ): ConstructWorkspace {
@@ -119,10 +119,68 @@ export function getEntryForCell(
   topology: Topology,
   cellId: string,
   direction: EntryDirection,
+  entryId?: string,
 ) {
+  if (entryId) {
+    const entryById = topology.entries.find(
+      (entry) =>
+        entry.id === entryId &&
+        entry.direction === direction &&
+        entry.cells.includes(cellId),
+    );
+
+    if (entryById) {
+      return entryById;
+    }
+  }
+
   return topology.entries.find(
     (entry) => entry.direction === direction && entry.cells.includes(cellId),
   );
+}
+
+function getEntriesForCellCycle(
+  topology: Topology,
+  cellId: string,
+): Array<{ id: string; direction: EntryDirection }> {
+  const entriesForCell = topology.entries.filter((entry) =>
+    entry.cells.includes(cellId),
+  );
+
+  const acrossEntry = entriesForCell.find(
+    (entry) => entry.direction === "across",
+  );
+  const downEntry = entriesForCell.find((entry) => entry.direction === "down");
+  const extraEntries = entriesForCell.filter(
+    (entry) => entry.direction === "extra",
+  );
+
+  const cycleEntries = [] as Array<{ id: string; direction: EntryDirection }>;
+
+  if (acrossEntry) {
+    cycleEntries.push({ id: acrossEntry.id, direction: acrossEntry.direction });
+  }
+
+  if (downEntry) {
+    cycleEntries.push({ id: downEntry.id, direction: downEntry.direction });
+  }
+
+  for (const entry of extraEntries) {
+    cycleEntries.push({ id: entry.id, direction: entry.direction });
+  }
+
+  return cycleEntries;
+}
+
+function selectionMatchesCycleEntry(
+  selection: SelectionState,
+  cycleEntry: { id: string; direction: EntryDirection },
+): boolean {
+  if (selection.entryId) {
+    return selection.entryId === cycleEntry.id;
+  }
+
+  return selection.direction === cycleEntry.direction;
 }
 
 export function toggleDirectionForRepeatedCellClick(
@@ -130,29 +188,41 @@ export function toggleDirectionForRepeatedCellClick(
   selection: SelectionState,
   clickedCellId: string,
 ): SelectionState {
+  const cycleEntries = getEntriesForCellCycle(topology, clickedCellId);
+  if (cycleEntries.length === 0) {
+    return selection;
+  }
+
   if (selection.cellId !== clickedCellId) {
-    const hasEntryInCurrentDirection = topology.entries.some(
-      (entry) =>
-        entry.direction === selection.direction &&
-        entry.cells.includes(clickedCellId),
-    );
+    const matchingEntry =
+      (selection.entryId
+        ? cycleEntries.find((entry) => entry.id === selection.entryId)
+        : undefined) ??
+      cycleEntries.find((entry) => entry.direction === selection.direction);
+    const nextEntry = matchingEntry ?? cycleEntries[0];
+    if (!nextEntry) {
+      return selection;
+    }
 
     return {
       cellId: clickedCellId,
-      direction: hasEntryInCurrentDirection ? selection.direction : "across",
+      direction: nextEntry.direction,
+      entryId: nextEntry.id,
     };
   }
 
-  const nextDirection: EntryDirection =
-    selection.direction === "across" ? "down" : "across";
-
-  const nextEntry = getEntryForCell(topology, clickedCellId, nextDirection);
+  const currentIndex = cycleEntries.findIndex((entry) =>
+    selectionMatchesCycleEntry(selection, entry),
+  );
+  const nextEntry =
+    cycleEntries[(currentIndex + 1 + cycleEntries.length) % cycleEntries.length];
   if (!nextEntry) {
     return selection;
   }
 
   return {
     cellId: clickedCellId,
-    direction: nextDirection,
+    direction: nextEntry.direction,
+    entryId: nextEntry.id,
   };
 }
