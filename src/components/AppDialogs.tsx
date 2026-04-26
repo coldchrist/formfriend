@@ -350,7 +350,7 @@ export function ShapeLibraryDialog({
                 <div>
                   {shape.kind === "composed"
                     ? `${shape.layout.width} × ${shape.layout.height}`
-                    : `${shape.width} × ${shape.height}`}
+                    : "—"}
                 </div>
                 <div>
                   {shape.kind === "composed"
