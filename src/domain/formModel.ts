@@ -919,7 +919,9 @@ export function setReducedCellOwnedSegment(
   let updatedActiveEntry = false;
 
   for (const mapping of mappings) {
-    const displayEntry = getDisplayEntryById(formModel, mapping.displayEntryId);
+    const displayEntry = mapping.displayEntryId
+      ? getDisplayEntryById(formModel, mapping.displayEntryId)
+      : undefined;
     if (!displayEntry) {
       continue;
     }
