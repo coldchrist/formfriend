@@ -1,10 +1,17 @@
 import type {
   EntryDirection,
+  CellLetterMode,
   EntryRef,
   FormFillState,
+  LetterFilterMode,
   PuzzleSpec,
   Topology,
 } from "./types";
+import {
+  filterTextForLetterFilterMode,
+  isLetterAllowedForFilterMode,
+  normalizeLettersOnly,
+} from "./letterFilter";
 
 export interface VisibleCell {
   id: string;
@@ -31,17 +38,29 @@ export interface CellFormWordMapping {
   cellId: string;
   formWordId: string;
   formWordOffset: number;
+  cellLetterSpan?: number;
   displayEntryId?: string;
 }
 
 export interface FormModel {
+  cellLetterMode: CellLetterMode;
+  letterFilterMode: LetterFilterMode;
   visibleCells: VisibleCell[];
   formWords: FormWord[];
   displayEntries: DisplayEntry[];
   mappings: CellFormWordMapping[];
 }
 
-function buildDoubleFormModel(topology: Topology): FormModel {
+function getCellLetterSpan(spec: PuzzleSpec): number {
+  return spec.cellLetterMode === "bigram" ? 2 : 1;
+}
+
+export function getPuzzleSpecCellLetterSpan(spec: PuzzleSpec): number {
+  return getCellLetterSpan(spec);
+}
+
+function buildDoubleFormModel(spec: PuzzleSpec, topology: Topology): FormModel {
+  const cellLetterSpan = getCellLetterSpan(spec);
   const visibleCells: VisibleCell[] = topology.cells.map((cell) => ({
     id: cell.id,
     row: cell.row,
@@ -57,7 +76,7 @@ function buildDoubleFormModel(topology: Topology): FormModel {
 
     formWords.push({
       id: formWordId,
-      length: entry.cells.length,
+      length: entry.cells.length * cellLetterSpan,
       label: entry.label,
     });
 
@@ -74,13 +93,16 @@ function buildDoubleFormModel(topology: Topology): FormModel {
       mappings.push({
         cellId: entry.cells[i],
         formWordId,
-        formWordOffset: i,
+        formWordOffset: i * cellLetterSpan,
+        cellLetterSpan,
         displayEntryId: entry.id,
       });
     }
   }
 
   return {
+    cellLetterMode: spec.cellLetterMode ?? "single",
+    letterFilterMode: spec.letterFilterMode ?? "all",
     visibleCells,
     formWords,
     displayEntries,
@@ -191,9 +213,10 @@ function buildSingleFormVisibleCells(topology: Topology): VisibleCell[] {
 }
 
 function buildSingleFormModel(
-  _spec: PuzzleSpec,
+  spec: PuzzleSpec,
   topology: Topology,
 ): FormModel {
+  const cellLetterSpan = getCellLetterSpan(spec);
   const visibleCells = buildSingleFormVisibleCells(topology);
   const formWords: FormWord[] = [];
   const displayEntries: DisplayEntry[] = [];
@@ -207,7 +230,7 @@ function buildSingleFormModel(
 
     formWords.push({
       id: formWordId,
-      length: representative.cells.length,
+      length: representative.cells.length * cellLetterSpan,
       label: group.map((entry) => entry.label).join("/"),
     });
 
@@ -225,7 +248,8 @@ function buildSingleFormModel(
         mappings.push({
           cellId: entry.cells[i],
           formWordId,
-          formWordOffset: i,
+          formWordOffset: i * cellLetterSpan,
+          cellLetterSpan,
           displayEntryId: entry.id,
         });
       }
@@ -233,6 +257,8 @@ function buildSingleFormModel(
   });
 
   return {
+    cellLetterMode: spec.cellLetterMode ?? "single",
+    letterFilterMode: spec.letterFilterMode ?? "all",
     visibleCells,
     formWords,
     displayEntries,
@@ -253,7 +279,7 @@ export function buildFormModelFromTopology(
     return buildSingleFormModel(spec, topology);
   }
 
-  return buildDoubleFormModel(topology);
+  return buildDoubleFormModel(spec, topology);
 }
 
 export function buildEmptyFormFillState(formModel: FormModel): FormFillState {
@@ -298,6 +324,90 @@ export function getFormWordById(
   return formModel.formWords.find((formWord) => formWord.id === formWordId);
 }
 
+
+function fillLooksLikeReducedPattern(
+  value: string,
+  expectedLength: number,
+  mode: LetterFilterMode,
+): boolean {
+  if (value.length > expectedLength) {
+    return false;
+  }
+
+  return value
+    .split("")
+    .every(
+      (char) =>
+        char === "_" ||
+        char === "?" ||
+        isLetterAllowedForFilterMode(char, mode),
+    );
+}
+
+function projectFillForGrid(
+  value: string,
+  expectedLength: number,
+  mode: LetterFilterMode,
+): string {
+  const normalized = value.toUpperCase().replace(/[^A-Z_?]/g, "");
+
+  if (mode === "all") {
+    return normalized.padEnd(expectedLength, "_").slice(0, expectedLength);
+  }
+
+  if (fillLooksLikeReducedPattern(normalized, expectedLength, mode)) {
+    return normalized.padEnd(expectedLength, "_").slice(0, expectedLength);
+  }
+
+  return filterTextForLetterFilterMode(normalized, mode)
+    .padEnd(expectedLength, "_")
+    .slice(0, expectedLength);
+}
+
+function getProjectedFormWordFill(
+  formModel: FormModel,
+  fillState: FormFillState,
+  formWordId: string,
+): string {
+  const formWord = getFormWordById(formModel, formWordId);
+  if (!formWord) {
+    return "";
+  }
+
+  if (formModel.letterFilterMode !== "all") {
+    const displayEntry = formModel.displayEntries.find(
+      (entry) => entry.formWordId === formWordId,
+    );
+    if (displayEntry) {
+      return getReducedSegmentsForDisplayEntry(formModel, fillState, displayEntry)
+        .map((segment, index) => {
+          const mapping = getMappingsForCell(formModel, displayEntry.cellIds[index]).find(
+            (item) => item.displayEntryId === displayEntry.id,
+          );
+          const span = mapping?.cellLetterSpan ?? 1;
+          return filterTextForLetterFilterMode(segment, formModel.letterFilterMode)
+            .padEnd(span, "_")
+            .slice(0, span);
+        })
+        .join("");
+    }
+  }
+
+  const rawFill = fillState.fillsByFormWordId[formWordId] ?? "";
+  return projectFillForGrid(
+    rawFill,
+    formWord.length,
+    formModel.letterFilterMode,
+  );
+}
+
+export function getReducedEntryText(
+  formModel: FormModel,
+  value: string,
+): string {
+  return filterTextForLetterFilterMode(value, formModel.letterFilterMode);
+}
+
 export function getDisplayedCellValue(
   formModel: FormModel,
   fillState: FormFillState,
@@ -308,8 +418,10 @@ export function getDisplayedCellValue(
   let resolved = "";
 
   for (const mapping of mappings) {
-    const fill = fillState.fillsByFormWordId[mapping.formWordId] ?? "";
-    const value = fill[mapping.formWordOffset] ?? "";
+    const fill = getProjectedFormWordFill(formModel, fillState, mapping.formWordId);
+    const span = mapping.cellLetterSpan ?? 1;
+    const rawValue = fill.slice(mapping.formWordOffset, mapping.formWordOffset + span);
+    const value = rawValue.replace(/_/g, "");
 
     if (!value) {
       continue;
@@ -335,10 +447,23 @@ export function getDisplayEntryPattern(
 ): string {
   return displayEntry.cellIds
     .map((cellId) => {
+      const mapping = getMappingsForCell(formModel, cellId).find(
+        (item) => item.displayEntryId === displayEntry.id,
+      );
+      const span = mapping?.cellLetterSpan ?? 1;
       const value = getDisplayedCellValue(formModel, fillState, cellId);
-      return value || "_";
+      return (value || "").padEnd(span, "_").slice(0, span);
     })
     .join("");
+}
+
+export function formFillStateHasCellConflicts(
+  formModel: FormModel,
+  fillState: FormFillState,
+): boolean {
+  return formModel.visibleCells.some(
+    (cell) => getDisplayedCellValue(formModel, fillState, cell.id) === "?",
+  );
 }
 
 export function buildFormFillStateFromCellFills(
@@ -361,7 +486,11 @@ export function buildFormFillStateFromCellFills(
     for (const mapping of mappings) {
       const value = fillsByCellId[mapping.cellId] ?? "";
       if (value) {
-        chars[mapping.formWordOffset] = value;
+        const span = mapping.cellLetterSpan ?? 1;
+        const normalized = value.toUpperCase().slice(0, span);
+        for (let i = 0; i < span; i += 1) {
+          chars[mapping.formWordOffset + i] = normalized[i] ?? "_";
+        }
       }
     }
 
@@ -446,11 +575,32 @@ export function applyWordToDisplayEntry(
     return fillState;
   }
 
+  const normalizedWord = normalizeLettersOnly(word);
+
+  if (formModel.letterFilterMode !== "all") {
+    const firstMapping = displayEntry.cellIds
+      .map((cellId) =>
+        getMappingsForCell(formModel, cellId).find(
+          (mapping) => mapping.displayEntryId === displayEntry.id,
+        ),
+      )
+      .find(Boolean);
+    const span = firstMapping?.cellLetterSpan ?? 1;
+    const segments = splitReducedRawTextIntoCellSegments(
+      normalizedWord,
+      displayEntry.cellIds.length,
+      span,
+      formModel.letterFilterMode,
+    );
+    return setReducedSegmentsForDisplayEntry(fillState, displayEntry, segments);
+  }
+
   return {
     fillsByFormWordId: {
       ...fillState.fillsByFormWordId,
-      [displayEntry.formWordId]: word,
+      [displayEntry.formWordId]: normalizedWord,
     },
+    reducedSegmentsByFormWordId: fillState.reducedSegmentsByFormWordId,
   };
 }
 
@@ -465,12 +615,18 @@ export function applyWordToDisplayEntryByCell(
     return fillState;
   }
 
+  if (formModel.letterFilterMode !== "all") {
+    return applyWordToDisplayEntry(formModel, fillState, displayEntryId, word);
+  }
+
   let nextState = fillState;
 
   for (let i = 0; i < displayEntry.cellIds.length; i += 1) {
     const cellId = displayEntry.cellIds[i];
-    const char = word[i] ?? "";
-    nextState = setDisplayedCellCharacter(formModel, nextState, cellId, char);
+    const mapping = getMappingsForCell(formModel, cellId).find((item) => item.displayEntryId === displayEntry.id);
+    const span = mapping?.cellLetterSpan ?? 1;
+    const value = word.slice(i * span, i * span + span);
+    nextState = setDisplayedCellCharacter(formModel, nextState, cellId, value);
   }
 
   return nextState;
@@ -513,6 +669,7 @@ export function setFormWordCharacter(
       ...fillState.fillsByFormWordId,
       [displayEntry.formWordId]: chars.join(""),
     },
+    reducedSegmentsByFormWordId: fillState.reducedSegmentsByFormWordId,
   };
 }
 
@@ -528,7 +685,12 @@ export function setDisplayedCellCharacter(
   }
 
   const nextFillsByFormWordId = { ...fillState.fillsByFormWordId };
-  const normalizedValue = value || "_";
+  const rawValue = normalizeLettersOnly(value)
+    .split("")
+    .filter((letter) =>
+      isLetterAllowedForFilterMode(letter, formModel.letterFilterMode),
+    )
+    .join("");
 
   for (const mapping of mappings) {
     const formWord = getFormWordById(formModel, mapping.formWordId);
@@ -548,13 +710,50 @@ export function setDisplayedCellCharacter(
       continue;
     }
 
-    chars[mapping.formWordOffset] = normalizedValue;
+    const span = mapping.cellLetterSpan ?? 1;
+    const normalizedValue = rawValue.slice(0, span);
+    for (let i = 0; i < span; i += 1) {
+      chars[mapping.formWordOffset + i] = normalizedValue[i] ?? "_";
+    }
     nextFillsByFormWordId[mapping.formWordId] = chars.join("");
   }
 
   return {
     fillsByFormWordId: nextFillsByFormWordId,
+    reducedSegmentsByFormWordId: fillState.reducedSegmentsByFormWordId,
   };
+}
+
+export function getDisplayEntryAnswerTextById(
+  formModel: FormModel,
+  fillState: FormFillState,
+  displayEntryId: string,
+): string {
+  const displayEntry = getDisplayEntryById(formModel, displayEntryId);
+  if (!displayEntry) {
+    return "";
+  }
+
+  const rawFill = fillState.fillsByFormWordId[displayEntry.formWordId] ?? "";
+  const rawLetters = normalizeLettersOnly(rawFill);
+  const pattern = getDisplayEntryPatternById(formModel, fillState, displayEntryId);
+
+  if (formModel.letterFilterMode === "all") {
+    return pattern;
+  }
+
+  const hasHiddenLetters = rawLetters
+    .split("")
+    .some(
+      (letter) =>
+        !isLetterAllowedForFilterMode(letter, formModel.letterFilterMode),
+    );
+
+  if (!rawLetters || !hasHiddenLetters) {
+    return pattern;
+  }
+
+  return `${rawLetters} → ${pattern}`;
 }
 
 export function getFormWordOffsetForDisplayEntryCell(
@@ -568,4 +767,178 @@ export function getFormWordOffsetForDisplayEntryCell(
   }
 
   return displayEntry.cellIds.indexOf(cellId);
+}
+
+function splitReducedRawTextIntoCellSegments(
+  value: string,
+  cellCount: number,
+  cellLetterSpan: number,
+  mode: LetterFilterMode,
+): string[] {
+  const normalized = normalizeLettersOnly(value);
+  const segments = Array.from({ length: cellCount }, () => "");
+  if (cellCount <= 0) {
+    return segments;
+  }
+
+  let cellIndex = 0;
+  let acceptedInCurrentCell = 0;
+
+  for (const letter of normalized) {
+    segments[cellIndex] += letter;
+
+    if (isLetterAllowedForFilterMode(letter, mode)) {
+      acceptedInCurrentCell += 1;
+      if (acceptedInCurrentCell >= cellLetterSpan && cellIndex < cellCount - 1) {
+        cellIndex += 1;
+        acceptedInCurrentCell = 0;
+      }
+    }
+  }
+
+  return segments;
+}
+
+function getReducedSegmentsForDisplayEntry(
+  formModel: FormModel,
+  fillState: FormFillState,
+  displayEntry: DisplayEntry,
+): string[] {
+  const explicitSegments =
+    fillState.reducedSegmentsByFormWordId?.[displayEntry.formWordId];
+
+  if (explicitSegments) {
+    return displayEntry.cellIds.map((_, index) =>
+      normalizeLettersOnly(explicitSegments[index] ?? ""),
+    );
+  }
+
+  const firstMapping = displayEntry.cellIds
+    .map((cellId) =>
+      getMappingsForCell(formModel, cellId).find(
+        (mapping) => mapping.displayEntryId === displayEntry.id,
+      ),
+    )
+    .find(Boolean);
+  const span = firstMapping?.cellLetterSpan ?? 1;
+  const rawFill = fillState.fillsByFormWordId[displayEntry.formWordId] ?? "";
+
+  return splitReducedRawTextIntoCellSegments(
+    rawFill,
+    displayEntry.cellIds.length,
+    span,
+    formModel.letterFilterMode,
+  );
+}
+
+function setReducedSegmentsForDisplayEntry(
+  fillState: FormFillState,
+  displayEntry: DisplayEntry,
+  segments: string[],
+): FormFillState {
+  const normalizedSegments = displayEntry.cellIds.map((_, index) =>
+    normalizeLettersOnly(segments[index] ?? ""),
+  );
+  const nextReducedSegmentsByFormWordId = {
+    ...(fillState.reducedSegmentsByFormWordId ?? {}),
+    [displayEntry.formWordId]: normalizedSegments,
+  };
+
+  return {
+    fillsByFormWordId: {
+      ...fillState.fillsByFormWordId,
+      [displayEntry.formWordId]: normalizedSegments.join(""),
+    },
+    reducedSegmentsByFormWordId: nextReducedSegmentsByFormWordId,
+  };
+}
+
+export function getReducedCellOwnedSegment(
+  formModel: FormModel,
+  fillState: FormFillState,
+  displayEntryId: string,
+  cellId: string,
+): string {
+  const displayEntry = getDisplayEntryById(formModel, displayEntryId);
+  if (!displayEntry || formModel.letterFilterMode === "all") {
+    return "";
+  }
+
+  const cellIndex = displayEntry.cellIds.indexOf(cellId);
+  if (cellIndex < 0) {
+    return "";
+  }
+
+  const segments = getReducedSegmentsForDisplayEntry(
+    formModel,
+    fillState,
+    displayEntry,
+  );
+
+  return segments[cellIndex] ?? "";
+}
+
+export function setReducedCellOwnedSegment(
+  formModel: FormModel,
+  fillState: FormFillState,
+  displayEntryId: string,
+  cellId: string,
+  segment: string,
+): FormFillState {
+  if (formModel.letterFilterMode === "all") {
+    return fillState;
+  }
+
+  const normalizedSegment = normalizeLettersOnly(segment);
+  const mappings = getMappingsForCell(formModel, cellId);
+  if (mappings.length === 0) {
+    return fillState;
+  }
+
+  let nextFillState = fillState;
+  let updatedActiveEntry = false;
+
+  for (const mapping of mappings) {
+    const displayEntry = getDisplayEntryById(formModel, mapping.displayEntryId);
+    if (!displayEntry) {
+      continue;
+    }
+
+    const cellIndex = displayEntry.cellIds.indexOf(cellId);
+    if (cellIndex < 0) {
+      continue;
+    }
+
+    const segments = getReducedSegmentsForDisplayEntry(
+      formModel,
+      nextFillState,
+      displayEntry,
+    );
+    segments[cellIndex] = normalizedSegment;
+    nextFillState = setReducedSegmentsForDisplayEntry(
+      nextFillState,
+      displayEntry,
+      segments,
+    );
+
+    if (mapping.displayEntryId === displayEntryId) {
+      updatedActiveEntry = true;
+    }
+  }
+
+  return updatedActiveEntry ? nextFillState : fillState;
+}
+
+export function reducedSegmentAcceptedLetterCount(
+  formModel: FormModel,
+  segment: string,
+): number {
+  if (formModel.letterFilterMode === "all") {
+    return normalizeLettersOnly(segment).length;
+  }
+
+  return normalizeLettersOnly(segment)
+    .split("")
+    .filter((letter) => isLetterAllowedForFilterMode(letter, formModel.letterFilterMode))
+    .length;
 }

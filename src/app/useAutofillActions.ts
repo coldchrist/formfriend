@@ -1,18 +1,11 @@
 import type { MutableRefObject, RefObject } from "react";
 import {
   autofillFormModel,
-  autofillGrid,
   type AutofillProgress,
 } from "../domain/autofill";
-import {
-  buildCellFillsFromFormFillState,
-  buildFormFillStateFromCellFills,
-  buildFormModelFromTopology,
-} from "../domain/formModel";
 import type { FormModel } from "../domain/formModel";
 import type { LoadedWordList } from "../domain/wordList";
 import type { PuzzleGridHandle } from "../components/PuzzleGrid";
-import type { FormStyle } from "../domain/types";
 import type { PuzzleStoreState } from "../state/puzzleStore";
 
 type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
@@ -24,14 +17,15 @@ type UiStatusSetter = (
 
 type UseAutofillActionsArgs = {
   loadedWordList: LoadedWordList | null;
-  currentFormStyle: FormStyle;
   formModel: FormModel;
   store: PuzzleStoreState;
   setStore: SetState<PuzzleStoreState>;
   lockCompletedWords: boolean;
   randomizeAutofillChoices: boolean;
+  autofillMinFrequencyBand: number;
   isAutofillRunning: boolean;
   autofillShouldContinueRef: MutableRefObject<boolean>;
+  autofillRunIdRef: MutableRefObject<number>;
   setIsAutofillRunning: SetState<boolean>;
   setAutofillStatusText: SetState<string>;
   setIsDirty: SetState<boolean>;
@@ -41,14 +35,15 @@ type UseAutofillActionsArgs = {
 
 export function useAutofillActions({
   loadedWordList,
-  currentFormStyle,
   formModel,
   store,
   setStore,
   lockCompletedWords,
   randomizeAutofillChoices,
+  autofillMinFrequencyBand,
   isAutofillRunning,
   autofillShouldContinueRef,
+  autofillRunIdRef,
   setIsAutofillRunning,
   setAutofillStatusText,
   setIsDirty,
@@ -66,123 +61,72 @@ export function useAutofillActions({
     }
 
     autofillShouldContinueRef.current = true;
+    const runId = autofillRunIdRef.current + 1;
+    autofillRunIdRef.current = runId;
     setIsAutofillRunning(true);
     setAutofillStatusText("Autofill running...");
     setUiStatus("Autofill running...", "info");
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     try {
-      if (currentFormStyle === "single") {
-        const result = await autofillFormModel(
-          formModel,
-          store.state,
-          loadedWordList,
-          {
-            lockCompletedWords,
-            randomizeChoices: randomizeAutofillChoices,
+      const result = await autofillFormModel(
+        formModel,
+        store.state,
+        loadedWordList,
+        {
+          lockCompletedWords,
+          randomizeChoices: randomizeAutofillChoices,
+          minFrequencyBand: autofillMinFrequencyBand,
+        },
+        {
+          shouldContinue: () =>
+            autofillShouldContinueRef.current &&
+            autofillRunIdRef.current === runId,
+          onProgress: (progress: AutofillProgress) => {
+            if (autofillRunIdRef.current !== runId) {
+              return;
+            }
+
+            setAutofillStatusText(
+              `Autofill running... nodes visited: ${progress.nodesVisited.toLocaleString()}`,
+            );
+
+            if (progress.partialFormFillState) {
+              setStore((prev) => ({
+                ...prev,
+                state: progress.partialFormFillState!,
+              }));
+            }
           },
-          {
-            shouldContinue: () => autofillShouldContinueRef.current,
-            onProgress: (progress: AutofillProgress) => {
-              setAutofillStatusText(
-                `Autofill running... nodes visited: ${progress.nodesVisited.toLocaleString()}`,
-              );
+          progressInterval: 1000,
+          yieldInterval: 250,
+        },
+      );
 
-              if (progress.partialFormFillState) {
-                setStore((prev) => ({
-                  ...prev,
-                  state: progress.partialFormFillState!,
-                }));
-              }
-            },
-            progressInterval: 1000,
-            yieldInterval: 250,
-          },
-        );
-
-        if (!autofillShouldContinueRef.current) {
-          setAutofillStatusText("Autofill cancelled.");
-          setUiStatus("Autofill cancelled.", "info");
-          return;
-        }
-
-        if (!result) {
-          setAutofillStatusText("Autofill failed: no solution found.");
-          setUiStatus("No autofill solution found.", "error");
-          return;
-        }
-
-        setStore((prev) => ({
-          ...prev,
-          state: result,
-        }));
-      } else {
-        const currentCellFills = buildCellFillsFromFormFillState(
-          formModel,
-          store.state,
-        );
-
-        const result = await autofillGrid(
-          store.topology,
-          currentCellFills,
-          loadedWordList,
-          {
-            lockCompletedWords,
-            randomizeChoices: randomizeAutofillChoices,
-          },
-          {
-            shouldContinue: () => autofillShouldContinueRef.current,
-            onProgress: (progress: AutofillProgress) => {
-              setAutofillStatusText(
-                `Autofill running... nodes visited: ${progress.nodesVisited.toLocaleString()}`,
-              );
-
-              if (progress.partialGridFillsByCellId) {
-                setStore((prev) => {
-                  const currentFormModel = buildFormModelFromTopology(
-                    prev.spec,
-                    prev.topology,
-                  );
-
-                  return {
-                    ...prev,
-                    state: buildFormFillStateFromCellFills(
-                      currentFormModel,
-                      progress.partialGridFillsByCellId!,
-                    ),
-                  };
-                });
-              }
-            },
-            progressInterval: 1000,
-            yieldInterval: 250,
-          },
-        );
-
-        if (!autofillShouldContinueRef.current) {
-          setAutofillStatusText("Autofill cancelled.");
-          setUiStatus("Autofill cancelled.", "info");
-          return;
-        }
-
-        if (!result) {
-          setAutofillStatusText("Autofill failed: no solution found.");
-          setUiStatus("No autofill solution found.", "error");
-          return;
-        }
-
-        setStore((prev) => {
-          const currentFormModel = buildFormModelFromTopology(
-            prev.spec,
-            prev.topology,
-          );
-
-          return {
-            ...prev,
-            state: buildFormFillStateFromCellFills(currentFormModel, result),
-          };
-        });
+      if (autofillRunIdRef.current !== runId) {
+        return;
       }
+
+      if (!autofillShouldContinueRef.current) {
+        setAutofillStatusText("Autofill cancelled.");
+        setUiStatus("Autofill cancelled.", "info");
+        return;
+      }
+
+      if (!result) {
+        setAutofillStatusText("Autofill failed: no solution found.");
+        setUiStatus("No autofill solution found.", "error");
+        return;
+      }
+
+      if (autofillRunIdRef.current !== runId) {
+        return;
+      }
+
+      setStore((prev) => ({
+        ...prev,
+        state: result,
+      }));
 
       setIsDirty(true);
       setAutofillStatusText("Autofill succeeded.");
@@ -192,7 +136,9 @@ export function useAutofillActions({
         gridRef.current?.focusGrid();
       });
     } finally {
-      setIsAutofillRunning(false);
+      if (autofillRunIdRef.current === runId) {
+        setIsAutofillRunning(false);
+      }
     }
   }
 

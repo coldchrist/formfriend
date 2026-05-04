@@ -1,10 +1,13 @@
 import type { Cell, EntryDirection, EntryRef, Topology } from "./types";
 import type {
   CellMaskShapeDefinition,
+  CompositeShapeDefinition,
   ComposedShapeDefinition,
   ShapeExtraEntry,
 } from "./shapeDefinition";
-import { buildOccupiedCellsFromComposedLayout } from "./shapeComposition";
+import { buildOccupiedCellsFromComposedLayout, getOccupiedCellBounds } from "./shapeComposition";
+import { applyVariantSelection } from "./shapeTransforms";
+import { areCompositeSchemasCompatible, describeCompositeCompatibilitySchema, getCompositeComponentCompatibilitySchema, type CompositeCompatibilitySchema } from "./shapeCompatibility";
 import {
   expandEntryPathToCellIds,
   validateEntryPath,
@@ -175,6 +178,7 @@ export function buildTopologyFromComposedShapeDefinition(
 
 export function buildTopologyFromCellMaskShapeDefinition(
   definition: CellMaskShapeDefinition,
+  context?: EntryPathExpansionContext,
 ): Topology {
   if (!Number.isInteger(definition.width) || definition.width < 1) {
     throw new Error("Cell mask width must be a positive integer.");
@@ -208,6 +212,130 @@ export function buildTopologyFromCellMaskShapeDefinition(
 
   return {
     cells,
-    entries: buildEntriesFromCells(cells, definition.extraEntries),
+    entries: buildEntriesFromCells(cells, definition.extraEntries, context),
+  };
+}
+
+function normalizeCellsToOrigin(cells: Array<{ row: number; col: number }>): Array<{ row: number; col: number }> {
+  const bounds = getOccupiedCellBounds(cells);
+  if (!bounds) {
+    return [];
+  }
+
+  return cells
+    .map((cell) => ({
+      row: cell.row - bounds.minRow,
+      col: cell.col - bounds.minCol,
+    }))
+    .sort(compareCellsReadingOrder);
+}
+
+function cellsFromCellMaskDefinition(
+  definition: CellMaskShapeDefinition,
+): Array<{ row: number; col: number }> {
+  return buildTopologyFromCellMaskShapeDefinition(definition).cells.map((cell) => ({
+    row: cell.row,
+    col: cell.col,
+  }));
+}
+
+export function buildTopologyFromCompositeShapeDefinition(
+  definition: CompositeShapeDefinition,
+): Topology {
+  if (!Number.isInteger(definition.primitiveSize) || definition.primitiveSize < 1) {
+    throw new Error("Composite primitive size must be a positive integer.");
+  }
+  if (!Number.isInteger(definition.componentGrid.width) || definition.componentGrid.width < 1) {
+    throw new Error("Composite component grid width must be a positive integer.");
+  }
+  if (!Number.isInteger(definition.componentGrid.height) || definition.componentGrid.height < 1) {
+    throw new Error("Composite component grid height must be a positive integer.");
+  }
+  if (!definition.componentGrid.cells.length) {
+    throw new Error("Composite shapes require at least one component.");
+  }
+
+  let componentSchema: CompositeCompatibilitySchema | null = null;
+  const occupied = new Set<string>();
+
+  for (const component of definition.componentGrid.cells) {
+    if (component.row < 0 || component.col < 0) {
+      throw new Error("Composite component coordinates must be non-negative.");
+    }
+    if (
+      component.row >= definition.componentGrid.height ||
+      component.col >= definition.componentGrid.width
+    ) {
+      throw new Error("Composite component placement is outside the component grid.");
+    }
+    if (component.definition.kind !== "composed") {
+      throw new Error("Composite components must be composed, non-composite shapes.");
+    }
+
+    const candidateSchema = getCompositeComponentCompatibilitySchema(
+      component,
+      definition.primitiveSize,
+    );
+    if (componentSchema === null) {
+      componentSchema = candidateSchema;
+      if (definition.overlapRows < 0 || definition.overlapRows >= componentSchema.slotHeight) {
+        throw new Error("Composite row overlap must be less than the component slot height.");
+      }
+      if (definition.overlapCols < 0 || definition.overlapCols >= componentSchema.slotWidth) {
+        throw new Error("Composite column overlap must be less than the component slot width.");
+      }
+    } else if (!areCompositeSchemasCompatible(componentSchema, candidateSchema)) {
+      throw new Error(
+        `Composite components must share the same slot size, overlap, and grid presentation. Expected ${describeCompositeCompatibilitySchema(componentSchema)}; got ${describeCompositeCompatibilitySchema(candidateSchema)} for ${component.definition.name}.`,
+      );
+    }
+
+    const componentCells = buildOccupiedCellsFromComposedLayout(
+      applyVariantSelection(
+        component.definition.layout,
+        component.shapeVariant ?? "left",
+        component.inverted ?? false,
+      ),
+      definition.primitiveSize,
+    );
+    const normalizedCells = normalizeCellsToOrigin(componentCells);
+    const bounds = getOccupiedCellBounds(normalizedCells);
+    if (!bounds) {
+      throw new Error("Composite component produced no occupied cells.");
+    }
+    if (bounds.height !== componentSchema.slotHeight || bounds.width !== componentSchema.slotWidth) {
+      throw new Error("Composite component bounds did not match its compatibility schema.");
+    }
+
+    const originRow = component.row * (componentSchema.slotHeight - definition.overlapRows);
+    const originCol = component.col * (componentSchema.slotWidth - definition.overlapCols);
+
+    for (const cell of normalizedCells) {
+      occupied.add(`${originRow + cell.row},${originCol + cell.col}`);
+    }
+  }
+
+  if (!occupied.size) {
+    throw new Error("Composite shape produced no occupied cells.");
+  }
+
+  const cells: Cell[] = [...occupied]
+    .map((key) => {
+      const [rowText, colText] = key.split(",");
+      const row = Number(rowText);
+      const col = Number(colText);
+      return {
+        id: cellId(row, col),
+        row,
+        col,
+      };
+    })
+    .sort(compareCellsReadingOrder);
+
+  return {
+    cells,
+    entries: buildEntriesFromCells(cells, definition.extraEntries, {
+      size: definition.primitiveSize,
+    }),
   };
 }

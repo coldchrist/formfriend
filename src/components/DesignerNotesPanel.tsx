@@ -4,7 +4,10 @@ import type { EntryPath } from "../domain/entryPath";
 type DesignerNotesPanelProps = {
   layoutRowsText: string;
   onConstruct: () => void;
+  designType: "primitive" | "composite";
   onStartFromShape: () => void;
+  onInsertPrimitiveShape: () => void;
+  onStartFromCompositeShape: () => void;
   onSaveShape: () => void;
   onClearGrid: () => void;
   onLoadShape: (file: File) => void | Promise<void>;
@@ -23,7 +26,10 @@ type DesignerNotesPanelProps = {
 export function DesignerNotesPanel({
   layoutRowsText,
   onConstruct,
+  designType,
   onStartFromShape,
+  onInsertPrimitiveShape,
+  onStartFromCompositeShape,
   onSaveShape,
   onClearGrid,
   onLoadShape,
@@ -66,14 +72,35 @@ export function DesignerNotesPanel({
 
       {/* Action buttons */}
       <div className="designer-actions">
-        <button
-          type="button"
-          className="designer-action-btn designer-action-btn--primary"
-          onClick={onStartFromShape}
-          title="Start the design grid from a standard library shape"
-        >
-          ⬚ Start from Shape
-        </button>
+        {designType === "composite" ? (
+          <>
+            <button
+              type="button"
+              className="designer-action-btn designer-action-btn--primary"
+              onClick={onInsertPrimitiveShape}
+              title="Insert a non-composite library shape into the selected component slot"
+            >
+              ⬚ Insert primitive shape
+            </button>
+            <button
+              type="button"
+              className="designer-action-btn"
+              onClick={onStartFromCompositeShape}
+              title="Start the composite designer from a composite library shape"
+            >
+              ⧉ Start from composite shape
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="designer-action-btn designer-action-btn--primary"
+            onClick={onStartFromShape}
+            title="Start the primitive design grid from a composed library shape"
+          >
+            ⬚ Start from Shape
+          </button>
+        )}
         <button
           type="button"
           className="designer-action-btn"

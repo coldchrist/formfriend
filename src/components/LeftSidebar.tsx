@@ -2,6 +2,7 @@ import { DesignerSidebar } from "../components/DesignerSidebar";
 import { Toolbar } from "../components/Toolbar";
 import type { AppMode, ShapeVariant } from "../domain/types";
 import type { ShapeDefinition } from "../domain/shapeDefinition";
+import type { ShapeDesignerDesignType } from "../domain/shapeDesignerState";
 
 type LeftSidebarProps = {
   isDesigner: boolean;
@@ -11,6 +12,7 @@ type LeftSidebarProps = {
   isConstruct: boolean;
   currentSize: number;
   designerState: {
+    designType: ShapeDesignerDesignType;
     name: string;
     size: number;
     layout: {
@@ -34,7 +36,6 @@ type LeftSidebarProps = {
     ) => LeftSidebarProps["designerState"],
   ) => void;
   onDesignerGridPresentationChange: (value: "square" | "hex") => void;
-  // unused in non-designer but kept for AppMode awareness
   storeMode: AppMode;
 };
 
@@ -64,19 +65,11 @@ export function LeftSidebar({
           isConstruct={isConstruct}
           currentSize={currentSize}
           shapeDisplayName={shapeDisplayName}
-          libraryShapeOptions={sessionShapeLibrary.map((shape) => ({
-            id: shape.id,
-            name: shape.name,
-          }))}
+          libraryShapeOptions={sessionShapeLibrary.map((shape) => ({ id: shape.id, name: shape.name }))}
           selectedLibraryShapeId={selectedLibraryShapeId}
           onLibraryShapeChange={(shapeId) => {
-            const definition = sessionShapeLibrary.find(
-              (item) => item.id === shapeId,
-            );
-            if (!definition) {
-              return;
-            }
-            onInstantiateLibraryShape(definition);
+            const definition = sessionShapeLibrary.find((item) => item.id === shapeId);
+            if (definition) onInstantiateLibraryShape(definition);
           }}
           onNewPuzzle={onNewPuzzle}
           onSave={onSave}
@@ -85,6 +78,7 @@ export function LeftSidebar({
         />
       ) : (
         <DesignerSidebar
+          designType={designerState.designType}
           shapeName={designerState.name}
           primitiveSize={safeDesignerPrimitiveSize}
           minimumPrimitiveSize={minimumDesignerPrimitiveSize}
@@ -93,45 +87,14 @@ export function LeftSidebar({
           height={designerState.layout.height}
           overlapRows={designerState.layout.overlapRows}
           overlapCols={designerState.layout.overlapCols}
-          onShapeNameChange={(value) =>
-            onDesignerStateChange((prev) => ({ ...prev, name: value }))
-          }
-          onPrimitiveSizeChange={(value) =>
-            onDesignerStateChange((prev) => ({ ...prev, size: value }))
-          }
+          onDesignTypeChange={(value) => onDesignerStateChange((prev) => ({ ...prev, designType: value }))}
+          onShapeNameChange={(value) => onDesignerStateChange((prev) => ({ ...prev, name: value }))}
+          onPrimitiveSizeChange={(value) => onDesignerStateChange((prev) => ({ ...prev, size: value }))}
           onGridPresentationChange={onDesignerGridPresentationChange}
-          onWidthChange={(value) =>
-            onDesignerStateChange((prev) => ({
-              ...prev,
-              layout: { ...prev.layout, width: value },
-            }))
-          }
-          onHeightChange={(value) =>
-            onDesignerStateChange((prev) => ({
-              ...prev,
-              layout: { ...prev.layout, height: value },
-            }))
-          }
-          onOverlapRowsChange={(value) =>
-            onDesignerStateChange((prev) => {
-              const minimumSize = Math.max(value, prev.layout.overlapCols) + 1;
-              return {
-                ...prev,
-                size: Math.max(prev.size, minimumSize),
-                layout: { ...prev.layout, overlapRows: value },
-              };
-            })
-          }
-          onOverlapColsChange={(value) =>
-            onDesignerStateChange((prev) => {
-              const minimumSize = Math.max(prev.layout.overlapRows, value) + 1;
-              return {
-                ...prev,
-                size: Math.max(prev.size, minimumSize),
-                layout: { ...prev.layout, overlapCols: value },
-              };
-            })
-          }
+          onWidthChange={(value) => onDesignerStateChange((prev) => ({ ...prev, layout: { ...prev.layout, width: value } }))}
+          onHeightChange={(value) => onDesignerStateChange((prev) => ({ ...prev, layout: { ...prev.layout, height: value } }))}
+          onOverlapRowsChange={(value) => onDesignerStateChange((prev) => ({ ...prev, layout: { ...prev.layout, overlapRows: value } }))}
+          onOverlapColsChange={(value) => onDesignerStateChange((prev) => ({ ...prev, layout: { ...prev.layout, overlapCols: value } }))}
         />
       )}
     </aside>

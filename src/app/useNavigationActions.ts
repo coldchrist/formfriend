@@ -1,10 +1,20 @@
+import { useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   buildCellFillsFromFormFillState,
   buildFormModelFromTopology,
+  getDisplayedCellValue,
+  getPuzzleSpecCellLetterSpan,
+  getReducedCellOwnedSegment,
+  reducedSegmentAcceptedLetterCount,
   setDisplayedCellCharacter,
+  setReducedCellOwnedSegment,
 } from "../domain/formModel";
+import {
+  isLetterAllowedForFilterMode,
+  normalizeLettersOnly,
+} from "../domain/letterFilter";
 import type { EntryRef, EntryDirection, FormStyle } from "../domain/types";
 import type { PuzzleStoreState } from "../state/puzzleStore";
 import { getEntryForCell } from "../state/puzzleStore";
@@ -50,7 +60,26 @@ export function useNavigationActions({
   singleClueEntries,
   currentFormStyle,
 }: UseNavigationActionsArgs) {
+  const reducedModeEditRef = useRef<{
+    cellId: string;
+    entryId: string;
+    segment: string;
+    rawText?: string;
+    sequential?: boolean;
+    allowTrailingHiddenAppend?: boolean;
+  } | null>(null);
+
+  function debugReducedInput(label: string, payload: unknown) {
+    if (
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("formfriend.debugReducedInput") === "1"
+    ) {
+      console.log(`[formfriend reduced input] ${label}`, payload);
+    }
+  }
+
   function selectEntry(entry: EntryRef) {
+    reducedModeEditRef.current = null;
     setStore((prev) => ({
       ...prev,
       selection: {
@@ -94,6 +123,7 @@ export function useNavigationActions({
     deltaRow: number,
     deltaCol: number,
   ) {
+    reducedModeEditRef.current = null;
     setStore((prev) => {
       const currentCell = getCellById(prev.topology, prev.selection.cellId);
       if (!currentCell) {
@@ -198,6 +228,10 @@ export function useNavigationActions({
     if (key === "Backspace") {
       event.preventDefault();
 
+      const priorReducedModeEdit = reducedModeEditRef.current;
+      let nextReducedModeEdit: typeof reducedModeEditRef.current =
+        priorReducedModeEdit;
+
       setStore((prev) => {
         if (!prev.selection.cellId) {
           return prev;
@@ -218,12 +252,59 @@ export function useNavigationActions({
           prev.topology,
         );
         const currentFormFillState = prev.state;
+        const cellLetterSpan = getPuzzleSpecCellLetterSpan(prev.spec);
+
+        if (currentFormModel.letterFilterMode !== "all") {
+          const currentSegment = getReducedCellOwnedSegment(
+            currentFormModel,
+            currentFormFillState,
+            entry.id,
+            prev.selection.cellId,
+          );
+          const nextSegment = currentSegment.slice(0, -1);
+          const nextFormFillState = setReducedCellOwnedSegment(
+            currentFormModel,
+            currentFormFillState,
+            entry.id,
+            prev.selection.cellId,
+            nextSegment,
+          );
+          nextReducedModeEdit = nextSegment
+            ? {
+                cellId: prev.selection.cellId,
+                entryId: entry.id,
+                segment: nextSegment,
+              }
+            : null;
+
+          return {
+            ...prev,
+            state: nextFormFillState,
+            selection: {
+              ...prev.selection,
+              cellId:
+                nextSegment.length > 0
+                  ? prev.selection.cellId
+                  : getPreviousCellIdInEntry(entry, prev.selection.cellId),
+            },
+          };
+        }
+
+        const currentCellValue = getDisplayedCellValue(
+          currentFormModel,
+          currentFormFillState,
+          prev.selection.cellId,
+        );
+        const nextCellValue =
+          cellLetterSpan > 1 && currentCellValue.length > 1
+            ? currentCellValue.slice(0, -1)
+            : "";
 
         const nextFormFillState = setDisplayedCellCharacter(
           currentFormModel,
           currentFormFillState,
           prev.selection.cellId,
-          "",
+          nextCellValue,
         );
 
         return {
@@ -231,11 +312,17 @@ export function useNavigationActions({
           state: nextFormFillState,
           selection: {
             ...prev.selection,
-            cellId: getPreviousCellIdInEntry(entry, prev.selection.cellId),
+            cellId:
+              nextCellValue.length > 0
+                ? prev.selection.cellId
+                : getPreviousCellIdInEntry(entry, prev.selection.cellId),
           },
         };
       });
 
+      queueMicrotask(() => {
+        reducedModeEditRef.current = nextReducedModeEdit;
+      });
       setIsDirty(true);
       setIncorrectCellIds(new Set());
       setIsSolutionCorrect(false);
@@ -246,6 +333,9 @@ export function useNavigationActions({
       event.preventDefault();
 
       const letter = key === " " ? "" : key.toUpperCase();
+      const priorReducedModeEdit = reducedModeEditRef.current;
+      let nextReducedModeEdit: typeof reducedModeEditRef.current =
+        priorReducedModeEdit;
 
       setStore((prev) => {
         if (!prev.selection.cellId) {
@@ -271,18 +361,149 @@ export function useNavigationActions({
           prev.state,
         );
         const currentFormFillState = prev.state;
+        const cellLetterSpan = getPuzzleSpecCellLetterSpan(prev.spec);
+
+        if (currentFormModel.letterFilterMode !== "all") {
+          const displayEntry = currentFormModel.displayEntries.find(
+            (candidate) => candidate.id === entry.id,
+          );
+          if (!displayEntry) {
+            return prev;
+          }
+
+          const editKey = {
+            cellId: prev.selection.cellId,
+            entryId: entry.id,
+          };
+          const currentCellIndex = displayEntry.cellIds.indexOf(
+            prev.selection.cellId,
+          );
+          if (currentCellIndex < 0) {
+            return prev;
+          }
+
+          const priorEditMatches =
+            priorReducedModeEdit &&
+            priorReducedModeEdit.cellId === editKey.cellId &&
+            priorReducedModeEdit.entryId === editKey.entryId;
+          const typedLetterIsAccepted =
+            letter !== "" &&
+            isLetterAllowedForFilterMode(
+              letter,
+              currentFormModel.letterFilterMode,
+            );
+          const rawFill = normalizeLettersOnly(
+            currentFormFillState.fillsByFormWordId[displayEntry.formWordId] ??
+              "",
+          );
+          const currentSegment = getReducedCellOwnedSegment(
+            currentFormModel,
+            currentFormFillState,
+            entry.id,
+            prev.selection.cellId,
+          );
+          const currentSegmentAcceptedLetterCount =
+            reducedSegmentAcceptedLetterCount(currentFormModel, currentSegment);
+
+          const continueSequentialTyping = Boolean(
+            priorEditMatches &&
+            priorReducedModeEdit.allowTrailingHiddenAppend &&
+            !typedLetterIsAccepted,
+          );
+
+          const startingSegment = continueSequentialTyping
+            ? (priorReducedModeEdit?.segment ?? currentSegment)
+            : priorEditMatches
+              ? priorReducedModeEdit.allowTrailingHiddenAppend &&
+                typedLetterIsAccepted
+                ? ""
+                : priorReducedModeEdit.segment
+              : currentSegmentAcceptedLetterCount === 0
+                ? currentSegment
+                : "";
+          const replacementSegment = `${startingSegment}${letter}`;
+          const nextFormFillState = setReducedCellOwnedSegment(
+            currentFormModel,
+            currentFormFillState,
+            entry.id,
+            prev.selection.cellId,
+            replacementSegment,
+          );
+          const nextRawFill = normalizeLettersOnly(
+            nextFormFillState.fillsByFormWordId[displayEntry.formWordId] ?? "",
+          );
+
+          const nextSegment = getReducedCellOwnedSegment(
+            currentFormModel,
+            nextFormFillState,
+            entry.id,
+            prev.selection.cellId,
+          );
+          const acceptedLetterCount = reducedSegmentAcceptedLetterCount(
+            currentFormModel,
+            nextSegment,
+          );
+          const segmentIsComplete = acceptedLetterCount >= cellLetterSpan;
+          const isLastCellInEntry =
+            currentCellIndex >= displayEntry.cellIds.length - 1;
+          const requestedNextCellId =
+            letter === "" || segmentIsComplete
+              ? prev.mode === "solve_strict" || prev.mode === "solve_checkable"
+                ? getNextSolveCellId(entry, prev.selection.cellId, fillsBefore)
+                : getNextCellIdInEntry(entry, prev.selection.cellId)
+              : prev.selection.cellId;
+          const nextCellId = requestedNextCellId ?? prev.selection.cellId;
+          const advancedToDifferentCell = nextCellId !== prev.selection.cellId;
+          const isAtEndOfEntry = isLastCellInEntry;
+
+          nextReducedModeEdit = {
+            ...editKey,
+            cellId: nextCellId,
+            segment: advancedToDifferentCell ? "" : nextSegment,
+            rawText: nextRawFill,
+            sequential: true,
+            allowTrailingHiddenAppend: isLastCellInEntry && segmentIsComplete,
+          };
+
+          return {
+            ...prev,
+            state: nextFormFillState,
+            selection: {
+              ...prev.selection,
+              cellId: nextCellId,
+            },
+          };
+        }
+
+        const currentCellValue = getDisplayedCellValue(
+          currentFormModel,
+          currentFormFillState,
+          prev.selection.cellId,
+        );
+        const nextCellValue =
+          cellLetterSpan > 1
+            ? (currentCellValue.length >= cellLetterSpan
+                ? letter
+                : `${currentCellValue}${letter}`
+              ).slice(0, cellLetterSpan)
+            : letter;
 
         const nextFormFillState = setDisplayedCellCharacter(
           currentFormModel,
           currentFormFillState,
           prev.selection.cellId,
-          letter,
+          nextCellValue,
         );
 
-        const nextCellId =
-          prev.mode === "solve_strict" || prev.mode === "solve_checkable"
+        const shouldAdvance =
+          nextCellValue.length >= cellLetterSpan || letter === "";
+        const nextCellId = !shouldAdvance
+          ? prev.selection.cellId
+          : prev.mode === "solve_strict" || prev.mode === "solve_checkable"
             ? getNextSolveCellId(entry, prev.selection.cellId, fillsBefore)
             : getNextCellIdInEntry(entry, prev.selection.cellId);
+
+        nextReducedModeEdit = null;
 
         return {
           ...prev,
@@ -294,6 +515,9 @@ export function useNavigationActions({
         };
       });
 
+      queueMicrotask(() => {
+        reducedModeEditRef.current = nextReducedModeEdit;
+      });
       setIsDirty(true);
       setIncorrectCellIds(new Set());
       setIsSolutionCorrect(false);
@@ -325,7 +549,11 @@ export function useNavigationActions({
     const entries =
       currentFormStyle === "single"
         ? singleClueEntries
-        : [...displayedAcrossEntries, ...displayedDownEntries, ...displayedExtraEntries];
+        : [
+            ...displayedAcrossEntries,
+            ...displayedDownEntries,
+            ...displayedExtraEntries,
+          ];
 
     if (event.key === "Tab") {
       event.preventDefault();
@@ -351,9 +579,14 @@ export function useNavigationActions({
     }
   }
 
+  function clearReducedModeEdit() {
+    reducedModeEditRef.current = null;
+  }
+
   return {
     handleEntryClick,
     handleGridKeyDown,
     handleClueInputKeyDown,
+    clearReducedModeEdit,
   };
 }

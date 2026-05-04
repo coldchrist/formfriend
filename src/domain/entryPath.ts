@@ -107,6 +107,12 @@ export type EntryPath =
       id: string;
       label?: string;
       segment: ParametricEntryLine;
+    }
+  | {
+      kind: "parametricPolyline";
+      id: string;
+      label?: string;
+      segments: ParametricEntryLine[];
     };
 
 export interface EntryPathExpansionContext {
@@ -249,7 +255,9 @@ export function expandEntryPath(
       ? [path.segment]
       : path.kind === "parametricLine"
         ? [normalizeLine(path.segment, context)]
-        : path.segments;
+        : path.kind === "parametricPolyline"
+          ? path.segments.map((segment) => normalizeLine(segment, context))
+          : path.segments;
   const coords: CellCoord[] = [];
 
   segments.forEach((segment, segmentIndex) => {
@@ -463,25 +471,35 @@ export function inferParametricEntryPathFromCellIds(
 ): EntryPath {
   const inferred = inferEntryPathFromCellIds(id, cellIds, label);
 
-  if (inferred.kind !== "line") {
-    return inferred;
+  const toParametricSegment = (segment: EntryLine): ParametricEntryLine => ({
+    kind: "parametricLine",
+    start: {
+      row: parametrizeCommonScalar(segment.start.row, size),
+      col: parametrizeCommonScalar(segment.start.col, size),
+    },
+    direction: segment.direction,
+    length: parametrizeCommonScalar(segment.length, size),
+  });
+
+  if (inferred.kind === "line") {
+    return {
+      kind: "parametricLine",
+      id,
+      label,
+      segment: toParametricSegment(inferred.segment),
+    };
   }
 
-  const segment = inferred.segment;
-  return {
-    kind: "parametricLine",
-    id,
-    label,
-    segment: {
-      kind: "parametricLine",
-      start: {
-        row: parametrizeCommonScalar(segment.start.row, size),
-        col: parametrizeCommonScalar(segment.start.col, size),
-      },
-      direction: segment.direction,
-      length: parametrizeCommonScalar(segment.length, size),
-    },
-  };
+  if (inferred.kind === "polyline") {
+    return {
+      kind: "parametricPolyline",
+      id,
+      label,
+      segments: inferred.segments.map(toParametricSegment),
+    };
+  }
+
+  return inferred;
 }
 
 export function describeEntryPath(path: EntryPath, context?: EntryPathExpansionContext): string {
@@ -489,6 +507,17 @@ export function describeEntryPath(path: EntryPath, context?: EntryPathExpansionC
     return `start (${describeScalar(path.segment.start.row)}, ${describeScalar(
       path.segment.start.col,
     )}), ${path.segment.direction}, length ${describeScalar(path.segment.length)}`;
+  }
+
+  if (path.kind === "parametricPolyline") {
+    return path.segments
+      .map(
+        (segment, index) =>
+          `segment ${index + 1}: start (${describeScalar(segment.start.row)}, ${describeScalar(
+            segment.start.col,
+          )}), ${segment.direction}, length ${describeScalar(segment.length)}`,
+      )
+      .join("; ");
   }
 
   const cellIds = expandEntryPathToCellIds(path, context);

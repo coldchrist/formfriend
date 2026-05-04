@@ -1,7 +1,7 @@
 import { CluePanel } from "./CluePanel";
 import { SolveToolbar } from "./SolveToolbar";
 import { PuzzleGrid, type PuzzleGridHandle } from "./PuzzleGrid";
-import type { AppMode, EntryRef, SelectionState } from "../domain/types";
+import type { AppMode, CellLetterMode, EntryRef, SelectionState } from "../domain/types";
 
 type SolveLayoutProps = {
   gridRef: React.RefObject<PuzzleGridHandle | null>;
@@ -20,6 +20,7 @@ type SolveLayoutProps = {
 
   // Grid
   projectedFillsByCellId: Record<string, string>;
+  cellLetterMode: CellLetterMode;
   selection: SelectionState;
   activeGridCellIds: string[];
   clueNumberByCellId: Record<string, string>;
@@ -35,6 +36,7 @@ type SolveLayoutProps = {
   displayedDownEntries: EntryRef[];
   displayedExtraEntries: EntryRef[];
   cluesByEntryId: Record<string, string>;
+  answerTextByEntryId?: Record<string, string>;
   activeClueEntryId?: string;
   activeEntry?: EntryRef;
 
@@ -98,6 +100,7 @@ export function SolveLayout({
   enigmaIssue,
   formNumber,
   projectedFillsByCellId,
+  cellLetterMode,
   selection,
   activeGridCellIds,
   clueNumberByCellId,
@@ -111,6 +114,7 @@ export function SolveLayout({
   displayedDownEntries,
   displayedExtraEntries,
   cluesByEntryId,
+  answerTextByEntryId,
   activeClueEntryId,
   activeEntry,
   loadedPuzzleFileName,
@@ -159,6 +163,8 @@ export function SolveLayout({
             downLabelByCellId={downLabelByCellId}
             gridPresentation={gridPresentation}
             incorrectCellIds={isSolveCheckable ? incorrectCellIds : new Set()}
+            cellSize={cellLetterMode === "bigram" ? 44 : undefined}
+            cellLetterMode={cellLetterMode}
             onCellClick={onCellClick}
             onKeyDown={onKeyDown}
           />
@@ -185,6 +191,7 @@ export function SolveLayout({
             title="Clues"
             entries={singleClueEntries}
             cluesByEntryId={cluesByEntryId}
+            answerTextByEntryId={answerTextByEntryId}
             activeEntryId={activeClueEntryId}
             readOnly
             fillAvailableHeight
@@ -198,6 +205,7 @@ export function SolveLayout({
               title="Across"
               entries={displayedAcrossEntries}
               cluesByEntryId={cluesByEntryId}
+              answerTextByEntryId={answerTextByEntryId}
               activeEntryId={
                 activeEntry?.direction === "across" ? activeEntry.id : undefined
               }
@@ -211,6 +219,7 @@ export function SolveLayout({
               title="Down"
               entries={displayedDownEntries}
               cluesByEntryId={cluesByEntryId}
+              answerTextByEntryId={answerTextByEntryId}
               activeEntryId={
                 activeEntry?.direction === "down" ? activeEntry.id : undefined
               }
@@ -225,6 +234,7 @@ export function SolveLayout({
                 title="Extra"
                 entries={displayedExtraEntries}
                 cluesByEntryId={cluesByEntryId}
+                answerTextByEntryId={answerTextByEntryId}
                 activeEntryId={
                   activeEntry?.direction === "extra" ? activeEntry.id : undefined
                 }

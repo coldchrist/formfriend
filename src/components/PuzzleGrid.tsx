@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
-import type { Cell, EntryRef, SelectionState, Topology } from "../domain/types";
+import type { Cell, CellLetterMode, EntryRef, SelectionState, Topology } from "../domain/types";
 
 export type PuzzleGridHandle = {
   focusGrid: () => void;
@@ -13,6 +13,7 @@ type PuzzleGridProps = {
   clueNumberByCellId: Record<string, string>;
   gridPresentation?: "square" | "hex";
   cellSize?: number;
+  cellLetterMode?: CellLetterMode;
   incorrectCellIds?: Set<string>;
   acrossLabelByCellId?: Record<string, string>;
   downLabelByCellId?: Record<string, string>;
@@ -57,6 +58,7 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
       clueNumberByCellId,
       gridPresentation = "square", // ← MUST BE HERE
       cellSize = DEFAULT_CELL_SIZE,
+      cellLetterMode = "single",
       acrossLabelByCellId = {},
       downLabelByCellId = {},
       onCellClick,
@@ -333,7 +335,7 @@ export const PuzzleGrid = forwardRef<PuzzleGridHandle, PuzzleGridProps>(
                 x={x + cellSize / 2}
                 y={y + cellSize / 2 + Math.floor(cellSize * 0.25)}
                 textAnchor="middle"
-                fontSize={Math.max(12, Math.floor(cellSize * 0.75))}
+                fontSize={Math.max(10, Math.floor(cellSize * (cellLetterMode === "bigram" ? 0.48 : ((fillsByCellId[cell.id] ?? "").length > 1 ? 0.48 : 0.75))))}
                 fontFamily="Arial, sans-serif"
               >
                 {fillsByCellId[cell.id] ?? ""}

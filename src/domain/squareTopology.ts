@@ -191,7 +191,7 @@ export function buildCellMaskTopology(spec: PuzzleSpec): Topology {
     height: spec.cellMaskHeight,
     rows: spec.cellMaskRows,
     extraEntries: spec.extraEntries,
-  });
+  }, { size: spec.size });
 }
 
 export function buildTopology(spec: PuzzleSpec): Topology {

@@ -1,6 +1,6 @@
 import type { SavedPuzzle, SolutionState } from "../domain/types";
 import type { FormModel } from "../domain/formModel";
-import { getMappingsForCell } from "../domain/formModel";
+import { getDisplayedCellValue } from "../domain/formModel";
 
 type PuzzleFileBuildInput = {
   spec: SavedPuzzle["spec"];
@@ -27,26 +27,26 @@ export function buildSolutionGrid(
   const maxCol = Math.max(...topology.cells.map((c) => c.col));
   const cellSet = new Set(topology.cells.map((c) => c.id));
 
-  // Build a per-cell letter lookup from fillsByFormWordId
-  const letterByCellId = new Map<string, string>();
+  const valueByCellId = new Map<string, string>();
+  let usesMultiCharacterCells = false;
+
   for (const cell of topology.cells) {
-    const mappings = getMappingsForCell(formModel, cell.id);
-    // Use the first mapping (across for double, either for single)
-    const mapping = mappings[0];
-    if (!mapping) continue;
-    const fill = solution.fillsByFormWordId[mapping.formWordId] ?? "";
-    const letter = fill[mapping.formWordOffset] ?? " ";
-    letterByCellId.set(cell.id, letter === "_" ? " " : letter);
+    const value = getDisplayedCellValue(formModel, solution, cell.id);
+    const normalized = value === "_" || value === "?" ? "" : value;
+    if (normalized.length > 1) {
+      usesMultiCharacterCells = true;
+    }
+    valueByCellId.set(cell.id, normalized);
   }
 
   const rows: string[] = [];
   for (let row = 0; row <= maxRow; row++) {
-    let rowStr = "";
+    const rowValues: string[] = [];
     for (let col = 0; col <= maxCol; col++) {
       const id = `r${row}c${col}`;
-      rowStr += cellSet.has(id) ? (letterByCellId.get(id) ?? " ") : " ";
+      rowValues.push(cellSet.has(id) ? (valueByCellId.get(id) || " ") : " ");
     }
-    rows.push(rowStr);
+    rows.push(usesMultiCharacterCells ? rowValues.join("\t") : rowValues.join(""));
   }
   return rows;
 }
@@ -70,6 +70,7 @@ export function buildPuzzleFile(input: PuzzleFileBuildInput): SavedPuzzle {
     topology: input.topology,
     content: input.content,
     state: input.state,
+    solutionState: input.solution,
     obfuscatedSolution: input.solution
       ? obfuscateSolutionGrid(
           buildSolutionGrid(input.solution, input.topology, input.formModel),
@@ -118,6 +119,7 @@ export async function readPuzzleFile(file: File): Promise<{
     topology: parsed.topology!,
     content: parsed.content!,
     state: parsed.state!,
+    solutionState: parsed.solutionState,
     obfuscatedSolution: parsed.obfuscatedSolution,
     gridPresentation: parsed.gridPresentation === "hex" ? "hex" : "square",
     dateAdded:
@@ -199,6 +201,15 @@ function validateSavedPuzzle(puzzle: Partial<SavedPuzzle>): void {
 
   if (!puzzle.state || typeof puzzle.state.fillsByFormWordId !== "object") {
     throw new Error("Puzzle file is missing state.");
+  }
+
+  if (
+    puzzle.solutionState !== undefined &&
+    (!puzzle.solutionState ||
+      typeof puzzle.solutionState !== "object" ||
+      typeof puzzle.solutionState.fillsByFormWordId !== "object")
+  ) {
+    throw new Error("Puzzle file has an invalid saved solution state.");
   }
 
   if (

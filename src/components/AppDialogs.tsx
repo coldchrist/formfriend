@@ -1,6 +1,7 @@
 import { isTopologyReflectableAcrossLeadingDiagonal } from "../domain/squareTopology";
 import { parseSerializedLayout } from "../domain/shapeLayout";
-import { supportsLeftRightVariant } from "../domain/shapeTransforms";
+import { supportsInversion, supportsLeftRightVariant } from "../domain/shapeTransforms";
+import { areCompositeSchemasCompatible, describeCompositeCompatibilitySchema, getComposedShapeCompatibilitySchema, type CompositeCompatibilitySchema } from "../domain/shapeCompatibility";
 import type { ShapeDefinition } from "../domain/shapeDefinition";
 import type { FormStyle, SavedPuzzle, ShapeVariant } from "../domain/types";
 
@@ -283,21 +284,99 @@ export function PuzzleLibraryDialog({
   );
 }
 
+type ShapeLibraryDialogMode = "startPrimitive" | "insertPrimitive" | "startComposite";
+
 type ShapeLibraryDialogProps = {
   shapes: ShapeDefinition[];
-  onLoadShape: (shape: ShapeDefinition) => void;
+  mode?: ShapeLibraryDialogMode;
+  primitiveSize?: number;
+  compositeCompatibilitySchema?: CompositeCompatibilitySchema | null;
+  onLoadShape: (shape: ShapeDefinition, shapeVariant?: ShapeVariant, inverted?: boolean) => void;
   onClose: () => void;
 };
 
 export function ShapeLibraryDialog({
   shapes,
+  mode = "startPrimitive",
+  primitiveSize = 4,
+  compositeCompatibilitySchema = null,
   onLoadShape,
   onClose,
 }: ShapeLibraryDialogProps) {
+  const isInsertPrimitive = mode === "insertPrimitive";
+
+  function variantChoices(shape: ShapeDefinition): Array<{ label: string; variant: ShapeVariant; inverted: boolean; disabled: boolean; reason?: string }> {
+    if (!isInsertPrimitive || shape.kind !== "composed") {
+      return [{ label: "Use", variant: "left", inverted: false, disabled: false }];
+    }
+
+    const supportsRight = supportsLeftRightVariant(
+      shape.layout,
+      shape.renderHints?.gridPresentation ?? "square",
+    );
+    const supportsInvert = supportsInversion(
+      shape.layout,
+      shape.renderHints?.gridPresentation ?? "square",
+    );
+    const baseChoices: Array<{ label: string; variant: ShapeVariant; inverted: boolean }> = [
+      { label: "Left", variant: "left", inverted: false },
+    ];
+
+    if (supportsRight) baseChoices.push({ label: "Right", variant: "right", inverted: false });
+    if (supportsInvert) baseChoices.push({ label: "Left inv.", variant: "left", inverted: true });
+    if (supportsRight && supportsInvert) baseChoices.push({ label: "Right inv.", variant: "right", inverted: true });
+
+    return baseChoices.map((choice) => {
+      if (!compositeCompatibilitySchema) {
+        return { ...choice, disabled: false };
+      }
+
+      try {
+        const candidateSchema = getComposedShapeCompatibilitySchema(
+          shape,
+          primitiveSize,
+          choice.variant,
+          choice.inverted,
+        );
+        const disabled = !areCompositeSchemasCompatible(
+          compositeCompatibilitySchema,
+          candidateSchema,
+        );
+        return {
+          ...choice,
+          disabled,
+          reason: disabled
+            ? `Needs ${describeCompositeCompatibilitySchema(compositeCompatibilitySchema)}; this variant is ${describeCompositeCompatibilitySchema(candidateSchema)}.`
+            : undefined,
+        };
+      } catch (error) {
+        return {
+          ...choice,
+          disabled: true,
+          reason: error instanceof Error ? error.message : "Could not validate shape compatibility.",
+        };
+      }
+    });
+  }
+
+  const filteredShapes = [...shapes]
+    .filter((shape) => {
+      if (mode === "startComposite") return shape.kind === "composite";
+      return shape.kind === "composed";
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const title =
+    mode === "startComposite"
+      ? "Start from composite shape"
+      : mode === "insertPrimitive"
+        ? "Insert primitive shape"
+        : "Start from Shape";
+
   return (
     <div className="dialog-backdrop">
       <div className="save-puzzle-dialog">
-        <h3>Start from Shape</h3>
+        <h3>{title}</h3>
 
         <div
           className="save-puzzle-fields"
@@ -306,7 +385,7 @@ export function ShapeLibraryDialog({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "2fr 1fr 1fr 1fr",
+              gridTemplateColumns: isInsertPrimitive ? "2fr 1fr 1fr 1.8fr" : "2fr 1fr 1fr 1fr",
               fontWeight: 600,
               borderBottom: "1px solid #ccc",
               paddingBottom: "4px",
@@ -317,48 +396,81 @@ export function ShapeLibraryDialog({
             <div>Name</div>
             <div>Grid</div>
             <div>Size</div>
-            <div>Overlap</div>
+            <div>{isInsertPrimitive ? "Variant" : "Overlap"}</div>
           </div>
 
-          {[...shapes]
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((shape) => (
-              <div
-                key={shape.id}
-                onClick={() => onLoadShape(shape)}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "2fr 1fr 1fr 1fr",
-                  padding: "4px 0",
-                  borderBottom: "1px solid #eee",
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "#f1f5f9")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "transparent")
-                }
-              >
-                <div>{shape.name}</div>
-                <div>
-                  {shape.renderHints?.gridPresentation === "hex"
-                    ? "Hex"
-                    : "Square"}
-                </div>
-                <div>
-                  {shape.kind === "composed"
-                    ? `${shape.layout.width} × ${shape.layout.height}`
-                    : "—"}
-                </div>
-                <div>
-                  {shape.kind === "composed"
-                    ? `${shape.layout.overlapRows} / ${shape.layout.overlapCols}`
-                    : "—"}
-                </div>
+          {filteredShapes.map((shape) => {
+            const choices = variantChoices(shape);
+            const allChoicesDisabled = isInsertPrimitive && choices.every((choice) => choice.disabled);
+            return (
+            <div
+              key={shape.id}
+              style={{
+                display: "grid",
+                gridTemplateColumns: isInsertPrimitive ? "2fr 1fr 1fr 1.8fr" : "2fr 1fr 1fr 1fr",
+                padding: "4px 0",
+                borderBottom: "1px solid #eee",
+                fontSize: "0.85rem",
+                cursor: isInsertPrimitive ? "default" : "pointer",
+                opacity: allChoicesDisabled ? 0.45 : 1,
+              }}
+              onClick={() => {
+                if (!isInsertPrimitive) onLoadShape(shape);
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#f1f5f9")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+              }
+            >
+              <div>{shape.name}</div>
+              <div>
+                {shape.renderHints?.gridPresentation === "hex"
+                  ? "Hex"
+                  : "Square"}
               </div>
-            ))}
+              <div>
+                {shape.kind === "composed"
+                  ? String(shape.layout.width) + " × " + String(shape.layout.height)
+                  : shape.kind === "cellMask"
+                    ? String(shape.width) + " × " + String(shape.height)
+                    : shape.kind === "composite"
+                      ? String(shape.componentGrid.width) + " × " + String(shape.componentGrid.height)
+                      : "—"}
+              </div>
+              <div>
+                {isInsertPrimitive ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
+                    {choices.map((choice) => (
+                      <button
+                        key={shape.id + "-" + choice.variant + "-" + String(choice.inverted)}
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (!choice.disabled) {
+                            onLoadShape(shape, choice.variant, choice.inverted);
+                          }
+                        }}
+                        disabled={choice.disabled}
+                        title={choice.reason}
+                        style={{ fontSize: "0.75rem" }}
+                      >
+                        {choice.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : shape.kind === "composed" ? (
+                  String(shape.layout.overlapRows) + " / " + String(shape.layout.overlapCols)
+                ) : shape.kind === "composite" ? (
+                  String(shape.overlapRows) + " / " + String(shape.overlapCols)
+                ) : (
+                  "—"
+                )}
+              </div>
+            </div>
+            );
+          })}
         </div>
 
         <div className="save-puzzle-buttons">

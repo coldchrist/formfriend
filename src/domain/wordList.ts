@@ -1,4 +1,5 @@
-import type { EntryRef } from "./types";
+import type { CellLetterMode, LetterFilterMode } from "./types";
+import { filterTextForLetterFilterMode } from "./letterFilter";
 
 export interface LoadedWordList {
   name: string;
@@ -185,23 +186,101 @@ export function parseWordListText(
   return loadedWordList;
 }
 
+
+interface TransformedWordListEntry {
+  entry: string;
+  transformed: string;
+}
+
+interface TransformedWordListView {
+  byLength: Map<number, TransformedWordListEntry[]>;
+}
+
+const transformedWordListCache = new WeakMap<
+  LoadedWordList,
+  Map<string, TransformedWordListView>
+>();
+
+function getTransformCacheKey(
+  cellLetterMode: CellLetterMode = "single",
+  letterFilterMode: LetterFilterMode = "all",
+): string {
+  return `${cellLetterMode}:${letterFilterMode}`;
+}
+
+function getTransformedWordListView(
+  wordList: LoadedWordList,
+  cellLetterMode: CellLetterMode = "single",
+  letterFilterMode: LetterFilterMode = "all",
+): TransformedWordListView {
+  const cacheKey = getTransformCacheKey(cellLetterMode, letterFilterMode);
+  let viewsByKey = transformedWordListCache.get(wordList);
+
+  if (!viewsByKey) {
+    viewsByKey = new Map<string, TransformedWordListView>();
+    transformedWordListCache.set(wordList, viewsByKey);
+  }
+
+  const cached = viewsByKey.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const byLength = new Map<number, TransformedWordListEntry[]>();
+
+  for (const entry of wordList.eligibleEntries) {
+    const transformed = filterTextForLetterFilterMode(entry, letterFilterMode);
+    if (!transformed) {
+      continue;
+    }
+
+    const bucket = byLength.get(transformed.length);
+    const transformedEntry = { entry, transformed };
+    if (bucket) {
+      bucket.push(transformedEntry);
+    } else {
+      byLength.set(transformed.length, [transformedEntry]);
+    }
+  }
+
+  for (const bucket of byLength.values()) {
+    bucket.sort((a, b) => compareEntriesByPreference(wordList, a.entry, b.entry));
+  }
+
+  const view = { byLength };
+  viewsByKey.set(cacheKey, view);
+  return view;
+}
+
 export function findMatchingWords(
   wordList: LoadedWordList,
   pattern: string,
   offset = 0,
   limit = Number.MAX_SAFE_INTEGER,
+  letterFilterMode: LetterFilterMode = "all",
+  cellLetterMode: CellLetterMode = "single",
 ): WordListMatchResult {
   const normalizedPattern = normalizeWordListEntry(pattern);
-  const source = wordList.byLength.get(normalizedPattern.length) ?? [];
-  const matches = source.filter((entry) => {
-    for (let i = 0; i < normalizedPattern.length; i += 1) {
-      const ch = normalizedPattern[i];
-      if (ch !== "." && ch !== "?" && ch !== "_" && entry[i] !== ch) {
-        return false;
+  const source =
+    getTransformedWordListView(wordList, cellLetterMode, letterFilterMode)
+      .byLength.get(normalizedPattern.length) ?? [];
+
+  const matches = source
+    .filter(({ transformed }) => {
+      for (let i = 0; i < normalizedPattern.length; i += 1) {
+        const ch = normalizedPattern[i];
+        if (
+          ch !== "." &&
+          ch !== "?" &&
+          ch !== "_" &&
+          transformed[i] !== ch
+        ) {
+          return false;
+        }
       }
-    }
-    return true;
-  });
+      return true;
+    })
+    .map(({ entry }) => entry);
 
   matches.sort((a, b) => compareEntriesByPreference(wordList, a, b));
 

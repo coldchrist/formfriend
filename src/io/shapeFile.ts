@@ -5,7 +5,8 @@ import {
   serializeSavedShapeDefinition,
   type SavedShapeDefinitionV1,
 } from "../domain/shapeSerialization";
-import type { ShapeDefinition } from "../domain/shapeDefinition";
+import type { CanonicalShapeDefinition, ShapeDefinition } from "../domain/shapeDefinition";
+import { getStandardShapeDefinitionById } from "../domain/standardShapeLibrary";
 
 function suggestedFileName(definition: ShapeDefinition): string {
   const base = definition.name.trim() || definition.id || "shape";
@@ -31,8 +32,9 @@ export function downloadShapeDefinitionFile(definition: ShapeDefinition): void {
 
 export async function readShapeDefinitionFile(
   file: File,
+  resolveShape: (shapeId: string) => CanonicalShapeDefinition | undefined = getStandardShapeDefinitionById,
 ): Promise<ShapeDefinition> {
   const text = await file.text();
   const saved: SavedShapeDefinitionV1 = parseSavedShapeDefinition(text);
-  return loadShapeDefinition(saved);
+  return loadShapeDefinition(saved, resolveShape);
 }

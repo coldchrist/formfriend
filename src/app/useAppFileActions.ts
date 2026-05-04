@@ -47,6 +47,7 @@ type UseAppFileActionsArgs = {
   isSolve: boolean;
   setUiStatus: UiStatusSetter;
   confirmDiscardChanges: (actionDescription: string) => boolean;
+  cancelAutofillForReset: () => void;
   gridRef: RefObject<PuzzleGridHandle | null>;
 
   currentPuzzleDateAdded: string;
@@ -117,18 +118,22 @@ function solutionGridToState(
   // Place each grid letter into the correct formWord slot
   for (let row = 0; row < grid.length; row++) {
     const rowStr = grid[row] ?? "";
-    for (let col = 0; col < rowStr.length; col++) {
-      const letter = rowStr[col] ?? " ";
-      if (letter === " ") continue;
+    const values = rowStr.includes("\t") ? rowStr.split("\t") : rowStr.split("");
+    for (let col = 0; col < values.length; col++) {
+      const value = values[col] ?? " ";
+      if (value === " ") continue;
       const cellId = `r${row}c${col}`;
       const mappings = getMappingsForCell(loadedFormModel, cellId);
       for (const mapping of mappings) {
         const fill = fillsByFormWordId[mapping.formWordId];
         if (fill !== undefined) {
+          const span = mapping.cellLetterSpan ?? 1;
+          const normalized = value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, span);
+          const replacement = normalized.padEnd(span, "_");
           fillsByFormWordId[mapping.formWordId] =
             fill.substring(0, mapping.formWordOffset) +
-            letter +
-            fill.substring(mapping.formWordOffset + 1);
+            replacement +
+            fill.substring(mapping.formWordOffset + span);
         }
       }
     }
@@ -152,6 +157,7 @@ export function useAppFileActions({
   isSolve,
   setUiStatus,
   confirmDiscardChanges,
+  cancelAutofillForReset,
   gridRef,
 
   currentPuzzleDateAdded,
@@ -278,24 +284,29 @@ export function useAppFileActions({
       return;
     }
 
+    cancelAutofillForReset();
+
     try {
       const { puzzle } = await readPuzzleFile(file);
       const solutionGrid = tryDecodeSolutionGrid(puzzle.obfuscatedSolution);
 
       setStore(() => {
-        const loadedMode: AppMode = isSolve
-          ? solutionGrid != null
-            ? "solve_checkable"
-            : "solve_strict"
-          : "construct";
         const loadedFormModel = buildFormModelFromTopology(
           puzzle.spec,
           puzzle.topology,
         );
 
-        const solution = solutionGrid
-          ? solutionGridToState(solutionGrid, puzzle.topology, loadedFormModel)
-          : undefined;
+        const solution =
+          puzzle.solutionState ??
+          (solutionGrid
+            ? solutionGridToState(solutionGrid, puzzle.topology, loadedFormModel)
+            : undefined);
+
+        const loadedMode: AppMode = isSolve
+          ? solution
+            ? "solve_checkable"
+            : "solve_strict"
+          : "construct";
 
         return {
           mode: loadedMode,
@@ -346,6 +357,8 @@ export function useAppFileActions({
       return;
     }
 
+    cancelAutofillForReset();
+
     const solutionGrid = tryDecodeSolutionGrid(puzzle.obfuscatedSolution);
     console.log("[library load] isSolve:", isSolve);
     console.log("[library load] solutionGrid:", solutionGrid);
@@ -354,20 +367,22 @@ export function useAppFileActions({
       puzzle.obfuscatedSolution?.slice(0, 20),
     );
     setStore(() => {
-      const loadedMode: AppMode = isSolve
-        ? solutionGrid != null
-          ? "solve_checkable"
-          : "solve_strict"
-        : "construct";
-
       const loadedFormModel = buildFormModelFromTopology(
         puzzle.spec,
         puzzle.topology,
       );
 
-      const solution = solutionGrid
-        ? solutionGridToState(solutionGrid, puzzle.topology, loadedFormModel)
-        : undefined;
+      const solution =
+        puzzle.solutionState ??
+        (solutionGrid
+          ? solutionGridToState(solutionGrid, puzzle.topology, loadedFormModel)
+          : undefined);
+
+      const loadedMode: AppMode = isSolve
+        ? solution
+          ? "solve_checkable"
+          : "solve_strict"
+        : "construct";
       console.log("[library load] loadedMode:", loadedMode);
       console.log("[library load] solution:", solution);
       return {
@@ -444,6 +459,8 @@ export function useAppFileActions({
       activeEntryPattern,
       0,
       WORD_LOOKUP_PAGE_SIZE,
+      formModel.letterFilterMode,
+      formModel.cellLetterMode,
     );
 
     if (result.total === 0) {
@@ -471,6 +488,8 @@ export function useAppFileActions({
       activeEntryPattern,
       wordLookupOffset,
       WORD_LOOKUP_PAGE_SIZE,
+      formModel.letterFilterMode,
+      formModel.cellLetterMode,
     );
 
     setWordLookupMatches((prev) => [...prev, ...result.matches]);

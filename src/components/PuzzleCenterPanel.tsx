@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { PuzzleGrid, type PuzzleGridHandle } from "../components/PuzzleGrid";
-import type { FormStyle, ShapeVariant, SelectionState } from "../domain/types";
+import type { CellLetterMode, FormStyle, LetterFilterMode, ShapeVariant, SelectionState } from "../domain/types";
 
 type PuzzleCenterPanelProps = {
   gridRef: React.RefObject<PuzzleGridHandle | null>;
@@ -14,6 +14,8 @@ type PuzzleCenterPanelProps = {
   size: number;
   allowedSizes: number[];
   formStyle: FormStyle;
+  cellLetterMode: CellLetterMode;
+  letterFilterMode: LetterFilterMode;
   canBeSingle: boolean;
   shapeVariant: ShapeVariant;
   supportsShapeVariantToggle: boolean;
@@ -25,6 +27,7 @@ type PuzzleCenterPanelProps = {
   isAutofillRunning: boolean;
   lockCompletedWords: boolean;
   randomizeAutofillChoices: boolean;
+  autofillMinFrequencyBand: number;
   metadata: {
     publication?: string;
     title: string;
@@ -47,6 +50,8 @@ type PuzzleCenterPanelProps = {
   // Construct actions
   onSizeChange: (size: number) => void;
   onFormStyleChange: (style: FormStyle) => void;
+  onCellLetterModeChange: (mode: CellLetterMode) => void;
+  onLetterFilterModeChange: (mode: LetterFilterMode) => void;
   onShapeVariantChange: (variant: ShapeVariant) => void;
   onInvertedChange: (inverted: boolean) => void;
   onClearGrid: () => void;
@@ -56,6 +61,7 @@ type PuzzleCenterPanelProps = {
   onLoadWordList: (file: File) => void;
   onLockCompletedWordsChange: (value: boolean) => void;
   onRandomizeAutofillChoicesChange: (value: boolean) => void;
+  onAutofillMinFrequencyBandChange: (value: number) => void;
 };
 
 export function PuzzleCenterPanel({
@@ -69,6 +75,8 @@ export function PuzzleCenterPanel({
   size,
   allowedSizes,
   formStyle,
+  cellLetterMode,
+  letterFilterMode,
   canBeSingle,
   shapeVariant,
   supportsShapeVariantToggle,
@@ -79,6 +87,7 @@ export function PuzzleCenterPanel({
   isAutofillRunning,
   lockCompletedWords,
   randomizeAutofillChoices,
+  autofillMinFrequencyBand,
   metadata,
   projectedFillsByCellId,
   selection,
@@ -96,6 +105,8 @@ export function PuzzleCenterPanel({
   onKeyDown,
   onSizeChange,
   onFormStyleChange,
+  onCellLetterModeChange,
+  onLetterFilterModeChange,
   onShapeVariantChange,
   onInvertedChange,
   onClearGrid,
@@ -105,6 +116,7 @@ export function PuzzleCenterPanel({
   onLoadWordList,
   onLockCompletedWordsChange,
   onRandomizeAutofillChoicesChange,
+  onAutofillMinFrequencyBandChange,
 }: PuzzleCenterPanelProps) {
   const wordListFileInputRef = useRef<HTMLInputElement | null>(null);
   const [showAutofillOptions, setShowAutofillOptions] = useState(false);
@@ -232,6 +244,8 @@ export function PuzzleCenterPanel({
           downLabelByCellId={downLabelByCellId}
           gridPresentation={gridPresentation}
           incorrectCellIds={isSolveCheckable ? incorrectCellIds : new Set()}
+          cellSize={cellLetterMode === "bigram" ? 44 : undefined}
+          cellLetterMode={cellLetterMode}
           onCellClick={onCellClick}
           onKeyDown={onKeyDown}
         />
@@ -358,6 +372,35 @@ export function PuzzleCenterPanel({
             </div>
           </div>
 
+          {/* Letter representation controls */}
+          <div className="construct-toolbar construct-toolbar--entry-mode">
+            <label className="construct-toolbar-select-label">
+              <span>Cells</span>
+              <select
+                value={cellLetterMode}
+                onChange={(e) =>
+                  onCellLetterModeChange(e.target.value as CellLetterMode)
+                }
+              >
+                <option value="single">Single letters</option>
+                <option value="bigram">Bigrams</option>
+              </select>
+            </label>
+            <label className="construct-toolbar-select-label">
+              <span>Entry letters</span>
+              <select
+                value={letterFilterMode}
+                onChange={(e) =>
+                  onLetterFilterModeChange(e.target.value as LetterFilterMode)
+                }
+              >
+                <option value="all">All letters</option>
+                <option value="vowelless">Vowelless</option>
+                <option value="consonantless">Consonantless</option>
+              </select>
+            </label>
+          </div>
+
           {/* Word tools toolbar */}
           <div className="construct-toolbar construct-toolbar--word">
             <input
@@ -475,6 +518,24 @@ export function PuzzleCenterPanel({
                 />
                 <span>Randomize autofill choices</span>
               </label>
+              <label className="construct-autofill-option construct-autofill-option--inline">
+                <span>Minimum word frequency score</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={autofillMinFrequencyBand}
+                  onChange={(e) => {
+                    const parsed = Number.parseInt(e.target.value, 10);
+                    onAutofillMinFrequencyBandChange(
+                      Number.isFinite(parsed) && parsed > 1 ? parsed : 1,
+                    );
+                  }}
+                />
+              </label>
+              <div className="construct-autofill-option-note">
+                Uses only candidate words with this frequency score or higher.
+              </div>
             </div>
           ) : null}
         </>

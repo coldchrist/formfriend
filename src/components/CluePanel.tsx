@@ -5,6 +5,7 @@ type CluePanelProps = {
   title: string;
   entries: EntryRef[];
   cluesByEntryId: Record<string, string>;
+  answerTextByEntryId?: Record<string, string>;
   activeEntryId?: string;
   readOnly?: boolean;
   fillAvailableHeight?: boolean;
@@ -29,6 +30,7 @@ export function CluePanel({
   title,
   entries,
   cluesByEntryId,
+  answerTextByEntryId = {},
   activeEntryId,
   readOnly = false,
   fillAvailableHeight = false,
@@ -118,6 +120,7 @@ export function CluePanel({
             >
               <label>
                 <span className="clue-label">{entry.label}</span>
+                <span className="clue-answer-text">{answerTextByEntryId[entry.id] ?? ""}</span>
                 <textarea
                   ref={(node) => {
                     if (isActive) {

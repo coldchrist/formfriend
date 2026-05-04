@@ -7,12 +7,16 @@ export type AppMode =
   | "solve_checkable"
   | "designer";
 export type FormStyle = "double" | "single";
+export type CellLetterMode = "single" | "bigram";
+export type LetterFilterMode = "all" | "vowelless" | "consonantless";
 
 export interface PuzzleSpec {
   shapeFamily: ShapeFamily;
   size: number;
   shapeVariant?: ShapeVariant;
   formStyle?: FormStyle;
+  cellLetterMode?: CellLetterMode;
+  letterFilterMode?: LetterFilterMode;
   inverted?: boolean;
   composedLayout?: string;
   overlapRows?: number;
@@ -62,6 +66,12 @@ export interface PuzzleContent {
 
 export interface FormFillState {
   fillsByFormWordId: Record<string, string>;
+  /**
+   * Explicit per-cell ownership of full answer text for vowelless/consonantless modes.
+   * Each array is aligned to the display entry cells for the form word. When absent,
+   * ownership is derived from fillsByFormWordId for backward compatibility.
+   */
+  reducedSegmentsByFormWordId?: Record<string, string[]>;
 }
 
 export interface PuzzleState extends FormFillState {}
@@ -92,6 +102,12 @@ export interface SavedPuzzle {
   topology: Topology;
   content: PuzzleContent;
   state: PuzzleState;
+  /**
+   * Canonical solved fill state. This preserves full answer text and, for
+   * reduced modes, explicit per-cell owned segments. obfuscatedSolution is kept
+   * only as a legacy/display-grid fallback.
+   */
+  solutionState?: SolutionState;
   obfuscatedSolution?: string;
   gridPresentation: "square" | "hex";
   dateAdded: string;

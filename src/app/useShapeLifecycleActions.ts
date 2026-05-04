@@ -16,7 +16,7 @@ import type {
   ShapeDefinition,
 } from "../domain/shapeDefinition";
 import { canonicalizeShapeDefinition } from "../domain/shapeSerialization";
-import type { FormStyle, ShapeVariant } from "../domain/types";
+import type { CellLetterMode, FormStyle, LetterFilterMode, ShapeVariant } from "../domain/types";
 import { DEFAULT_EXTRA_ENTRY_READING_POLICY } from "../domain/entryPath";
 import type { PuzzleStoreState } from "../state/puzzleStore";
 import { getTodayString, resolveFormStyleForTopology } from "./appHelpers";
@@ -34,6 +34,8 @@ type UseShapeLifecycleActionsArgs = {
   activeShapeDefinition: ShapeDefinition | null;
   currentShapeVariant: ShapeVariant;
   currentFormStyle: FormStyle;
+  currentCellLetterMode: CellLetterMode;
+  currentLetterFilterMode: LetterFilterMode;
   currentInverted: boolean;
   currentShapeSupportsInversion: boolean;
   currentShapeSupportsLeftRight: boolean;
@@ -50,6 +52,7 @@ type UseShapeLifecycleActionsArgs = {
   setLoadedPuzzleFileName: SetState<string | null>;
   setUiStatus: UiStatusSetter;
   confirmDiscardChanges: (actionDescription: string) => boolean;
+  cancelAutofillForReset: () => void;
 };
 
 export function useShapeLifecycleActions({
@@ -58,6 +61,8 @@ export function useShapeLifecycleActions({
   activeShapeDefinition,
   currentShapeVariant,
   currentFormStyle,
+  currentCellLetterMode,
+  currentLetterFilterMode,
   currentInverted,
   currentShapeSupportsInversion,
   currentShapeSupportsLeftRight,
@@ -74,6 +79,7 @@ export function useShapeLifecycleActions({
   setLoadedPuzzleFileName,
   setUiStatus,
   confirmDiscardChanges,
+  cancelAutofillForReset,
 }: UseShapeLifecycleActionsArgs) {
   void canBeSingle;
   void sessionShapeLibrary;
@@ -105,6 +111,8 @@ export function useShapeLifecycleActions({
       orientation?: ShapeOrientation;
       inverted?: boolean;
       requestedFormStyle?: FormStyle;
+      cellLetterMode?: CellLetterMode;
+      letterFilterMode?: LetterFilterMode;
       uiMessage?: string;
     },
   ) {
@@ -112,6 +120,8 @@ export function useShapeLifecycleActions({
     const orientation = options?.orientation ?? "left";
     const inverted = options?.inverted ?? false;
     const requestedFormStyle = options?.requestedFormStyle ?? currentFormStyle;
+    const requestedCellLetterMode = options?.cellLetterMode ?? currentCellLetterMode;
+    const requestedLetterFilterMode = options?.letterFilterMode ?? currentLetterFilterMode;
     const transformedDefinition = transformDefinitionForPlacement(
       definition,
       size,
@@ -139,6 +149,8 @@ export function useShapeLifecycleActions({
               ? "right"
               : "left") as ShapeVariant,
             inverted,
+            cellLetterMode: requestedCellLetterMode,
+            letterFilterMode: requestedLetterFilterMode,
           }
         : {
             ...requestedSpec,
@@ -147,6 +159,8 @@ export function useShapeLifecycleActions({
               ? "right"
               : "left") as ShapeVariant,
             inverted,
+            cellLetterMode: requestedCellLetterMode,
+            letterFilterMode: requestedLetterFilterMode,
           };
 
     const topology =
@@ -211,6 +225,8 @@ export function useShapeLifecycleActions({
       return;
     }
 
+    cancelAutofillForReset();
+
     instantiateComposedShape(activeShapeDefinition, {
       size,
       orientation: currentShapeVariant === "right" ? "right" : "left",
@@ -235,6 +251,8 @@ export function useShapeLifecycleActions({
     if (!activeShapeDefinition) {
       return;
     }
+
+    cancelAutofillForReset();
 
     instantiateComposedShape(activeShapeDefinition, {
       size: store.spec.size,
@@ -261,6 +279,8 @@ export function useShapeLifecycleActions({
       return;
     }
 
+    cancelAutofillForReset();
+
     instantiateComposedShape(activeShapeDefinition, {
       size: store.spec.size,
       orientation: currentShapeVariant === "right" ? "right" : "left",
@@ -285,6 +305,8 @@ export function useShapeLifecycleActions({
     const resolvedSize = allowedSizes.includes(size)
       ? size
       : allowedSizes[allowedSizes.length - 1];
+
+    cancelAutofillForReset();
 
     instantiateComposedShape(activeShapeDefinition, {
       size: resolvedSize,
@@ -315,6 +337,8 @@ export function useShapeLifecycleActions({
       return;
     }
 
+    cancelAutofillForReset();
+
     instantiateComposedShape(activeShapeDefinition, {
       size: store.spec.size,
       orientation: currentShapeVariant === "right" ? "right" : "left",
@@ -330,6 +354,8 @@ export function useShapeLifecycleActions({
   function instantiateLibraryShapeFromSelection(
     definition: ShapeDefinition,
   ) {
+    cancelAutofillForReset();
+
     try {
       const minSize =
         definition.kind === "composed"

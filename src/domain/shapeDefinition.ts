@@ -2,7 +2,7 @@ import type { EntryPath, ExtraEntryReadingPolicy } from "./entryPath";
 
 export type ShapePrimitive = "." | "S" | "L" | "R" | "l" | "r";
 
-export type ShapeDefinitionKind = "composed" | "cellMask" | "explicit";
+export type ShapeDefinitionKind = "composed" | "cellMask" | "composite" | "explicit";
 
 export interface ComposedShapeLayout {
   width: number;
@@ -55,9 +55,38 @@ export interface CanonicalCellMaskShapeDefinition {
   renderHints?: ShapeRenderHints;
 }
 
+export type CompositeShapeVariant = "left" | "right";
+
+export interface CompositeComponentPlacement {
+  row: number;
+  col: number;
+  shapeId: string;
+  shapeVariant?: CompositeShapeVariant;
+  inverted?: boolean;
+}
+
+export interface CanonicalCompositeShapeDefinition {
+  version: 1;
+  kind: "composite";
+  id: string;
+  name: string;
+  componentGrid: {
+    width: number;
+    height: number;
+    cells: CompositeComponentPlacement[];
+  };
+  overlapRows: number;
+  overlapCols: number;
+  primitiveSize: number;
+  renderHints?: ShapeRenderHints;
+  extraEntries?: ShapeExtraEntry[];
+  extraEntryReadingPolicy?: ExtraEntryReadingPolicy;
+}
+
 export type CanonicalShapeDefinition =
   | CanonicalComposedShapeDefinition
-  | CanonicalCellMaskShapeDefinition;
+  | CanonicalCellMaskShapeDefinition
+  | CanonicalCompositeShapeDefinition;
 
 /**
  * Normalized runtime shape definitions.
@@ -88,6 +117,27 @@ export interface CellMaskShapeDefinition {
   renderHints?: ShapeRenderHints;
 }
 
+export type CompositeRuntimeComponent = CompositeComponentPlacement & {
+  definition: ComposedShapeDefinition | CellMaskShapeDefinition;
+};
+
+export interface CompositeShapeDefinition {
+  kind: "composite";
+  id: string;
+  name: string;
+  componentGrid: {
+    width: number;
+    height: number;
+    cells: CompositeRuntimeComponent[];
+  };
+  overlapRows: number;
+  overlapCols: number;
+  primitiveSize: number;
+  renderHints?: ShapeRenderHints;
+  extraEntries?: ShapeExtraEntry[];
+  extraEntryReadingPolicy?: ExtraEntryReadingPolicy;
+}
+
 export interface ExplicitShapeDefinition {
   kind: "explicit";
   id: string;
@@ -98,6 +148,7 @@ export interface ExplicitShapeDefinition {
 export type ShapeDefinition =
   | ComposedShapeDefinition
   | CellMaskShapeDefinition
+  | CompositeShapeDefinition
   | ExplicitShapeDefinition;
 
 export function isShapePrimitive(value: string): value is ShapePrimitive {

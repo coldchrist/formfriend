@@ -293,6 +293,95 @@ const STANDARD_SHAPES: CanonicalShapeDefinition[] = [
   },
   {
     version: 1,
+    kind: "composite",
+    id: "truncated-pyramill",
+    name: "Truncated Pyramill",
+    componentGrid: {
+      width: 2,
+      height: 2,
+      cells: [
+        {
+          row: 0,
+          col: 0,
+          shapeId: "truncated-pyramid",
+          shapeVariant: "left",
+          inverted: false,
+        },
+        {
+          row: 1,
+          col: 1,
+          shapeId: "truncated-pyramid",
+          shapeVariant: "right",
+          inverted: true,
+        },
+      ],
+    },
+    overlapRows: 1,
+    overlapCols: 1,
+    primitiveSize: 5,
+    renderHints: {
+      gridPresentation: "square",
+    },
+    extraEntryReadingPolicy: "rightward-then-downward",
+    extraEntries: [
+      {
+        kind: "parametricPolyline",
+        id: "X1",
+        label: "X1",
+        segments: [
+          {
+            kind: "parametricLine",
+            start: {
+              row: 0,
+              col: {
+                kind: "sizeAffine",
+                sizeMultiplier: 1,
+                offset: -1,
+              },
+            },
+            direction: "east",
+            length: 2,
+          },
+          {
+            kind: "parametricLine",
+            start: {
+              row: 0,
+              col: {
+                kind: "sizeAffine",
+                sizeMultiplier: 1,
+                offset: 0,
+              },
+            },
+            direction: "southeast",
+            length: {
+              kind: "sizeAffine",
+              sizeMultiplier: 2,
+              offset: -1,
+            },
+          },
+          {
+            kind: "parametricLine",
+            start: {
+              row: {
+                kind: "sizeAffine",
+                sizeMultiplier: 2,
+                offset: -2,
+              },
+              col: {
+                kind: "sizeAffine",
+                sizeMultiplier: 3,
+                offset: -2,
+              },
+            },
+            direction: "east",
+            length: 2,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: 1,
     kind: "composed",
     id: "left-star",
     name: "Left Star",
@@ -351,7 +440,7 @@ export function getAllStandardShapeDefinitions(): CanonicalShapeDefinition[] {
 
 export function getAllStandardShapes(): ShapeDefinition[] {
   return getAllStandardShapeDefinitions().map((shape) =>
-    normalizeShapeDefinition(shape),
+    normalizeShapeDefinition(shape, getStandardShapeDefinitionById),
   );
 }
 
@@ -363,5 +452,5 @@ export function getStandardShapeDefinitionById(
 
 export function getStandardShapeById(id: string): ShapeDefinition | undefined {
   const shape = getStandardShapeDefinitionById(id);
-  return shape ? normalizeShapeDefinition(shape) : undefined;
+  return shape ? normalizeShapeDefinition(shape, getStandardShapeDefinitionById) : undefined;
 }

@@ -6,14 +6,16 @@ import {
 } from "./wordList";
 import {
   applyWordToDisplayEntryByCell,
+  formFillStateHasCellConflicts,
   getDisplayEntryPatternById,
   type FormModel,
 } from "./formModel";
-import type { EntryRef, FormFillState, Topology } from "./types";
+import type { CellLetterMode, EntryRef, FormFillState, LetterFilterMode, Topology } from "./types";
 
 export type AutofillOptions = {
   lockCompletedWords: boolean;
   randomizeChoices: boolean;
+  minFrequencyBand?: number;
 };
 
 export type AutofillProgress = {
@@ -25,6 +27,7 @@ export type AutofillProgress = {
 export interface FormWordAutofillOptions {
   randomizeChoices?: boolean;
   lockCompletedWords?: boolean;
+  minFrequencyBand?: number;
 }
 
 interface FormWordChoice {
@@ -67,7 +70,7 @@ function getRepresentativeDisplayEntries(formModel: FormModel) {
 }
 
 function patternIsComplete(pattern: string): boolean {
-  return pattern.length > 0 && !pattern.includes("_");
+  return pattern.length > 0 && !pattern.includes("_") && !pattern.includes("?");
 }
 
 function shuffleSliceInPlace(
@@ -111,13 +114,32 @@ function randomizeWithinFrequencyBands(
   return shuffled;
 }
 
+function normalizeMinimumFrequencyBand(value: number | undefined): number {
+  if (!Number.isFinite(value) || value === undefined) {
+    return 1;
+  }
+
+  return Math.max(1, Math.floor(value));
+}
+
 function getPreferredMatches(
   wordList: LoadedWordList,
   pattern: string,
+  minFrequencyBand?: number,
+  letterFilterMode: LetterFilterMode = "all",
+  cellLetterMode: CellLetterMode = "single",
 ): string[] {
+  const minimumBand = normalizeMinimumFrequencyBand(minFrequencyBand);
   const matches = [
-    ...findMatchingWords(wordList, pattern, 0, Number.MAX_SAFE_INTEGER).matches,
-  ];
+    ...findMatchingWords(
+      wordList,
+      pattern,
+      0,
+      Number.MAX_SAFE_INTEGER,
+      letterFilterMode,
+      cellLetterMode,
+    ).matches,
+  ].filter((word) => getEntryFrequencyBand(wordList, word) >= minimumBand);
 
   matches.sort((a, b) => compareEntriesByPreference(wordList, a, b));
   return matches;
@@ -145,7 +167,13 @@ function chooseNextFormWordChoice(
       continue;
     }
 
-    const matches = getPreferredMatches(wordList, pattern);
+    const matches = getPreferredMatches(
+      wordList,
+      pattern,
+      options.minFrequencyBand,
+      formModel.letterFilterMode,
+      formModel.cellLetterMode,
+    );
 
     if (matches.length === 0) {
       return {
@@ -275,6 +303,10 @@ async function autofillFormWordsRecursive(
       word,
     );
 
+    if (formFillStateHasCellConflicts(formModel, nextState)) {
+      continue;
+    }
+
     const nextUsedWords = new Set(usedWords);
     nextUsedWords.add(word);
 
@@ -397,9 +429,11 @@ function getCandidatesForEntry(
 ): string[] {
   const pattern = getPatternForEntry(entry, fillsByCellId);
 
-  const matches = getPreferredMatches(wordList, pattern).filter(
-    (word) => !usedWords.has(word),
-  );
+  const matches = getPreferredMatches(
+    wordList,
+    pattern,
+    options.minFrequencyBand,
+  ).filter((word) => !usedWords.has(word));
 
   if (!options.randomizeChoices) {
     return matches;
