@@ -212,10 +212,7 @@ function buildSingleFormVisibleCells(topology: Topology): VisibleCell[] {
   }));
 }
 
-function buildSingleFormModel(
-  spec: PuzzleSpec,
-  topology: Topology,
-): FormModel {
+function buildSingleFormModel(spec: PuzzleSpec, topology: Topology): FormModel {
   const cellLetterSpan = getCellLetterSpan(spec);
   const visibleCells = buildSingleFormVisibleCells(topology);
   const formWords: FormWord[] = [];
@@ -324,7 +321,6 @@ export function getFormWordById(
   return formModel.formWords.find((formWord) => formWord.id === formWordId);
 }
 
-
 function fillLooksLikeReducedPattern(
   value: string,
   expectedLength: number,
@@ -379,13 +375,21 @@ function getProjectedFormWordFill(
       (entry) => entry.formWordId === formWordId,
     );
     if (displayEntry) {
-      return getReducedSegmentsForDisplayEntry(formModel, fillState, displayEntry)
+      return getReducedSegmentsForDisplayEntry(
+        formModel,
+        fillState,
+        displayEntry,
+      )
         .map((segment, index) => {
-          const mapping = getMappingsForCell(formModel, displayEntry.cellIds[index]).find(
-            (item) => item.displayEntryId === displayEntry.id,
-          );
+          const mapping = getMappingsForCell(
+            formModel,
+            displayEntry.cellIds[index],
+          ).find((item) => item.displayEntryId === displayEntry.id);
           const span = mapping?.cellLetterSpan ?? 1;
-          return filterTextForLetterFilterMode(segment, formModel.letterFilterMode)
+          return filterTextForLetterFilterMode(
+            segment,
+            formModel.letterFilterMode,
+          )
             .padEnd(span, "_")
             .slice(0, span);
         })
@@ -418,9 +422,16 @@ export function getDisplayedCellValue(
   let resolved = "";
 
   for (const mapping of mappings) {
-    const fill = getProjectedFormWordFill(formModel, fillState, mapping.formWordId);
+    const fill = getProjectedFormWordFill(
+      formModel,
+      fillState,
+      mapping.formWordId,
+    );
     const span = mapping.cellLetterSpan ?? 1;
-    const rawValue = fill.slice(mapping.formWordOffset, mapping.formWordOffset + span);
+    const rawValue = fill.slice(
+      mapping.formWordOffset,
+      mapping.formWordOffset + span,
+    );
     const value = rawValue.replace(/_/g, "");
 
     if (!value) {
@@ -623,7 +634,9 @@ export function applyWordToDisplayEntryByCell(
 
   for (let i = 0; i < displayEntry.cellIds.length; i += 1) {
     const cellId = displayEntry.cellIds[i];
-    const mapping = getMappingsForCell(formModel, cellId).find((item) => item.displayEntryId === displayEntry.id);
+    const mapping = getMappingsForCell(formModel, cellId).find(
+      (item) => item.displayEntryId === displayEntry.id,
+    );
     const span = mapping?.cellLetterSpan ?? 1;
     const value = word.slice(i * span, i * span + span);
     nextState = setDisplayedCellCharacter(formModel, nextState, cellId, value);
@@ -736,7 +749,11 @@ export function getDisplayEntryAnswerTextById(
 
   const rawFill = fillState.fillsByFormWordId[displayEntry.formWordId] ?? "";
   const rawLetters = normalizeLettersOnly(rawFill);
-  const pattern = getDisplayEntryPatternById(formModel, fillState, displayEntryId);
+  const pattern = getDisplayEntryPatternById(
+    formModel,
+    fillState,
+    displayEntryId,
+  );
 
   if (formModel.letterFilterMode === "all") {
     return pattern;
@@ -789,7 +806,10 @@ function splitReducedRawTextIntoCellSegments(
 
     if (isLetterAllowedForFilterMode(letter, mode)) {
       acceptedInCurrentCell += 1;
-      if (acceptedInCurrentCell >= cellLetterSpan && cellIndex < cellCount - 1) {
+      if (
+        acceptedInCurrentCell >= cellLetterSpan &&
+        cellIndex < cellCount - 1
+      ) {
         cellIndex += 1;
         acceptedInCurrentCell = 0;
       }
@@ -939,6 +959,7 @@ export function reducedSegmentAcceptedLetterCount(
 
   return normalizeLettersOnly(segment)
     .split("")
-    .filter((letter) => isLetterAllowedForFilterMode(letter, formModel.letterFilterMode))
-    .length;
+    .filter((letter) =>
+      isLetterAllowedForFilterMode(letter, formModel.letterFilterMode),
+    ).length;
 }

@@ -1,4 +1,7 @@
-import { buildTopologyFromComposedShapeDefinition, buildTopologyFromCompositeShapeDefinition } from "../domain/shapeTopology";
+import {
+  buildTopologyFromComposedShapeDefinition,
+  buildTopologyFromCompositeShapeDefinition,
+} from "../domain/shapeTopology";
 import { isHexPreviewValid } from "../domain/hexPreviewValidation";
 import { getAllStandardShapeDefinitions } from "../domain/standardShapeLibrary";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -45,6 +48,7 @@ import type {
   CanonicalShapeDefinition,
   ShapeDefinition,
   ShapePrimitive,
+  ComposedShapeDefinition,
 } from "../domain/shapeDefinition";
 import type { EntryPath, ExtraEntryReadingPolicy } from "../domain/entryPath";
 import {
@@ -85,7 +89,12 @@ import {
   supportsLeftRightVariant,
   type ShapeOrientation,
 } from "../domain/shapeTransforms";
-import { areCompositeSchemasCompatible, describeCompositeCompatibilitySchema, getComposedShapeCompatibilitySchema, type CompositeCompatibilitySchema } from "../domain/shapeCompatibility";
+import {
+  areCompositeSchemasCompatible,
+  describeCompositeCompatibilitySchema,
+  getComposedShapeCompatibilitySchema,
+  type CompositeCompatibilitySchema,
+} from "../domain/shapeCompatibility";
 import {
   downloadShapeDefinitionFile,
   readShapeDefinitionFile,
@@ -214,49 +223,56 @@ export default function App() {
       )
     : minimumDesignerPrimitiveSize;
   const normalizedShapeById = useMemo(() => {
-    return new Map(normalizedSessionShapeLibrary.map((shape) => [shape.id, shape]));
+    return new Map(
+      normalizedSessionShapeLibrary.map((shape) => [shape.id, shape]),
+    );
   }, [normalizedSessionShapeLibrary]);
 
   const componentNameById = useMemo(() => {
-    return Object.fromEntries(normalizedSessionShapeLibrary.map((shape) => [shape.id, shape.name]));
+    return Object.fromEntries(
+      normalizedSessionShapeLibrary.map((shape) => [shape.id, shape.name]),
+    );
   }, [normalizedSessionShapeLibrary]);
 
-  const compositeCompatibilitySchema = useMemo<CompositeCompatibilitySchema | null>(() => {
-    if (shapeDesignerState.designType !== "composite") {
-      return null;
-    }
+  const compositeCompatibilitySchema =
+    useMemo<CompositeCompatibilitySchema | null>(() => {
+      if (shapeDesignerState.designType !== "composite") {
+        return null;
+      }
 
-    const firstComponent = [...shapeDesignerState.componentGrid.cells].sort(
-      (a, b) => a.row - b.row || a.col - b.col,
-    )[0];
+      const firstComponent = [...shapeDesignerState.componentGrid.cells].sort(
+        (a, b) => a.row - b.row || a.col - b.col,
+      )[0];
 
-    if (!firstComponent) {
-      return null;
-    }
+      if (!firstComponent) {
+        return null;
+      }
 
-    const componentShape = normalizedShapeById.get(firstComponent.shapeId);
-    if (!componentShape || componentShape.kind !== "composed") {
-      return null;
-    }
+      const componentShape = normalizedShapeById.get(firstComponent.shapeId);
+      if (!componentShape || componentShape.kind !== "composed") {
+        return null;
+      }
 
-    try {
-      return getComposedShapeCompatibilitySchema(
-        componentShape,
-        safeDesignerPrimitiveSize,
-        firstComponent.shapeVariant ?? "left",
-        firstComponent.inverted ?? false,
-      );
-    } catch {
-      return null;
-    }
-  }, [
-    normalizedShapeById,
-    safeDesignerPrimitiveSize,
-    shapeDesignerState.componentGrid.cells,
-    shapeDesignerState.designType,
-  ]);
+      try {
+        return getComposedShapeCompatibilitySchema(
+          componentShape,
+          safeDesignerPrimitiveSize,
+          firstComponent.shapeVariant ?? "left",
+          firstComponent.inverted ?? false,
+        );
+      } catch {
+        return null;
+      }
+    }, [
+      normalizedShapeById,
+      safeDesignerPrimitiveSize,
+      shapeDesignerState.componentGrid.cells,
+      shapeDesignerState.designType,
+    ]);
 
-  function buildDesignerShapeDefinition(extraEntries: EntryPath[] = designerExtraEntries): ShapeDefinition {
+  function buildDesignerShapeDefinition(
+    extraEntries: EntryPath[] = designerExtraEntries,
+  ): ShapeDefinition {
     if (shapeDesignerState.designType === "composite") {
       return buildCompositeShapeDefinitionFromDesignerState(
         shapeDesignerState,
@@ -277,34 +293,42 @@ export default function App() {
   const designerPreviewResult = useMemo(() => {
     try {
       const definition = buildDesignerShapeDefinition(designerExtraEntries);
-      const topology = definition.kind === "composite"
-        ? buildTopologyFromCompositeShapeDefinition({
-            ...definition,
-            primitiveSize: safeDesignerPrimitiveSize,
-          })
-        : buildTopologyFromComposedShapeDefinition(
-            definition,
-            safeDesignerPrimitiveSize,
-          );
-      return { topology, error: null as string | null };
-    } catch (error) {
-      const firstMessage = error instanceof Error ? error.message : "Failed to build designer preview.";
-      try {
-        const definition = buildDesignerShapeDefinition([]);
-        const topology = definition.kind === "composite"
+      const topology =
+        definition.kind === "composite"
           ? buildTopologyFromCompositeShapeDefinition({
               ...definition,
               primitiveSize: safeDesignerPrimitiveSize,
             })
           : buildTopologyFromComposedShapeDefinition(
-              definition,
+              definition as ComposedShapeDefinition,
               safeDesignerPrimitiveSize,
             );
+      return { topology, error: null as string | null };
+    } catch (error) {
+      const firstMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to build designer preview.";
+      try {
+        const definition = buildDesignerShapeDefinition([]);
+        const topology =
+          definition.kind === "composite"
+            ? buildTopologyFromCompositeShapeDefinition({
+                ...definition,
+                primitiveSize: safeDesignerPrimitiveSize,
+              })
+            : buildTopologyFromComposedShapeDefinition(
+                definition as ComposedShapeDefinition,
+                safeDesignerPrimitiveSize,
+              );
         return { topology, error: firstMessage };
       } catch (fallbackError) {
         return {
           topology: { cells: [], entries: [] },
-          error: fallbackError instanceof Error ? fallbackError.message : firstMessage,
+          error:
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : firstMessage,
         };
       }
     }
@@ -335,7 +359,7 @@ export default function App() {
           });
         } else {
           buildTopologyFromComposedShapeDefinition(
-            definition,
+            definition as ComposedShapeDefinition,
             safeDesignerPrimitiveSize,
           );
         }
@@ -388,8 +412,10 @@ export default function App() {
 
   const currentShapeVariant: ShapeVariant = store.spec.shapeVariant ?? "left";
   const currentFormStyle: FormStyle = store.spec.formStyle ?? "double";
-  const currentCellLetterMode: CellLetterMode = store.spec.cellLetterMode ?? "single";
-  const currentLetterFilterMode: LetterFilterMode = store.spec.letterFilterMode ?? "all";
+  const currentCellLetterMode: CellLetterMode =
+    store.spec.cellLetterMode ?? "single";
+  const currentLetterFilterMode: LetterFilterMode =
+    store.spec.letterFilterMode ?? "all";
   const currentInverted = store.spec.inverted ?? false;
 
   const canBeSingle = useMemo(() => {
@@ -674,7 +700,6 @@ export default function App() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   });
-
 
   function cancelAutofillForReset() {
     if (
@@ -1151,7 +1176,9 @@ export default function App() {
           definition.renderHints?.gridPresentation ?? "square",
         );
       } else {
-        throw new Error("Only composed and composite shapes can be loaded in Designer mode.");
+        throw new Error(
+          "Only composed and composite shapes can be loaded in Designer mode.",
+        );
       }
 
       setDesignerExtraEntries(definition.extraEntries ?? []);
@@ -1214,19 +1241,26 @@ export default function App() {
       setPendingExtraEntryCellIds([]);
       setIsDefiningExtraEntry(false);
       setSelectedDesignerExtraEntryId(null);
-      setDesignerGridPresentation(shape.renderHints?.gridPresentation ?? "square");
+      setDesignerGridPresentation(
+        shape.renderHints?.gridPresentation ?? "square",
+      );
       upsertSessionShape(shape);
       setSelectedLibraryShapeId(shape.id);
       setStore((prev) => ({ ...prev, mode: "designer" }));
       setShapeLibraryDialogMode(null);
       setIsDirty(true);
-      setUiStatus(`Started composite designer from shape: ${shape.name}`, "success");
+      setUiStatus(
+        `Started composite designer from shape: ${shape.name}`,
+        "success",
+      );
       return;
     }
 
     if (shapeDesignerState.designType === "composite") {
       if (shape.kind !== "composed") {
-        window.alert("Only composed shapes can be inserted as primitive components.");
+        window.alert(
+          "Only composed shapes can be inserted as primitive components.",
+        );
         return;
       }
 
@@ -1261,7 +1295,9 @@ export default function App() {
       setShapeDesignerState((prev) =>
         placeComponentAtSelection(prev, shape.id, shapeVariant, inverted),
       );
-      setDesignerGridPresentation(shape.renderHints?.gridPresentation ?? "square");
+      setDesignerGridPresentation(
+        shape.renderHints?.gridPresentation ?? "square",
+      );
       setShapeLibraryDialogMode(null);
       setIsDirty(true);
       setUiStatus(`Placed component: ${shape.name}`, "success");
@@ -1269,7 +1305,9 @@ export default function App() {
     }
 
     if (shape.kind !== "composed") {
-      window.alert("Only composed shapes can be loaded in primitive Designer mode.");
+      window.alert(
+        "Only composed shapes can be loaded in primitive Designer mode.",
+      );
       return;
     }
 
@@ -1334,7 +1372,10 @@ export default function App() {
         `X${nextNumber}`,
       );
 
-      const definition = buildDesignerShapeDefinition([...designerExtraEntries, path]);
+      const definition = buildDesignerShapeDefinition([
+        ...designerExtraEntries,
+        path,
+      ]);
       if (definition.kind === "composite") {
         buildTopologyFromCompositeShapeDefinition({
           ...definition,
@@ -1342,7 +1383,7 @@ export default function App() {
         });
       } else {
         buildTopologyFromComposedShapeDefinition(
-          definition,
+          definition as ComposedShapeDefinition,
           safeDesignerPrimitiveSize,
         );
       }
@@ -1441,7 +1482,9 @@ export default function App() {
       return;
     }
 
-    if (!confirmDiscardChanges("change the cell letter mode and reset the grid")) {
+    if (
+      !confirmDiscardChanges("change the cell letter mode and reset the grid")
+    ) {
       return;
     }
 
@@ -1461,7 +1504,9 @@ export default function App() {
     setIsSolutionCorrect(false);
     setIsDirty(true);
     setUiStatus(
-      mode === "bigram" ? "Bigram cell mode enabled." : "Single-letter cell mode enabled.",
+      mode === "bigram"
+        ? "Bigram cell mode enabled."
+        : "Single-letter cell mode enabled.",
       "success",
     );
   }
@@ -1471,7 +1516,9 @@ export default function App() {
       return;
     }
 
-    if (!confirmDiscardChanges("change the letter filter mode and reset the grid")) {
+    if (
+      !confirmDiscardChanges("change the letter filter mode and reset the grid")
+    ) {
       return;
     }
 
@@ -1595,12 +1642,30 @@ export default function App() {
     const key = event.key;
 
     if (shapeDesignerState.designType === "composite") {
-      if (key === "ArrowLeft" || key === "ArrowRight" || key === "ArrowUp" || key === "ArrowDown") {
+      if (
+        key === "ArrowLeft" ||
+        key === "ArrowRight" ||
+        key === "ArrowUp" ||
+        key === "ArrowDown"
+      ) {
         event.preventDefault();
-        const delta = key === "ArrowLeft" ? [0, -1] : key === "ArrowRight" ? [0, 1] : key === "ArrowUp" ? [-1, 0] : [1, 0];
+        const delta =
+          key === "ArrowLeft"
+            ? [0, -1]
+            : key === "ArrowRight"
+              ? [0, 1]
+              : key === "ArrowUp"
+                ? [-1, 0]
+                : [1, 0];
         setShapeDesignerState((prev) => ({
           ...prev,
-          componentSelection: moveGridSelection(prev.componentGrid.width, prev.componentGrid.height, prev.componentSelection, delta[0], delta[1]),
+          componentSelection: moveGridSelection(
+            prev.componentGrid.width,
+            prev.componentGrid.height,
+            prev.componentSelection,
+            delta[0],
+            delta[1],
+          ),
         }));
         return;
       }
@@ -1720,9 +1785,13 @@ export default function App() {
   ) {
     setShapeDesignerState((prev) => {
       const currentWidth =
-        prev.designType === "composite" ? prev.componentGrid.width : prev.layout.width;
+        prev.designType === "composite"
+          ? prev.componentGrid.width
+          : prev.layout.width;
       const currentHeight =
-        prev.designType === "composite" ? prev.componentGrid.height : prev.layout.height;
+        prev.designType === "composite"
+          ? prev.componentGrid.height
+          : prev.layout.height;
       const next = updater({
         designType: prev.designType,
         name: prev.name,
@@ -1756,11 +1825,7 @@ export default function App() {
         );
       }
 
-      return resizeDesignerLayout(
-        base,
-        next.layout.width,
-        next.layout.height,
-      );
+      return resizeDesignerLayout(base, next.layout.width, next.layout.height);
     });
   }
 
@@ -1894,22 +1959,26 @@ export default function App() {
     cancelAutofillForReset,
   });
 
-  const { handleEntryClick, handleGridKeyDown, handleClueInputKeyDown, clearReducedModeEdit } =
-    useNavigationActions({
-      store,
-      setStore,
-      setIsDirty,
-      setIncorrectCellIds,
-      setIsSolutionCorrect,
-      activeEntry,
-      acrossEntries,
-      downEntries,
-      displayedAcrossEntries,
-      displayedDownEntries,
-      displayedExtraEntries,
-      singleClueEntries,
-      currentFormStyle,
-    });
+  const {
+    handleEntryClick,
+    handleGridKeyDown,
+    handleClueInputKeyDown,
+    clearReducedModeEdit,
+  } = useNavigationActions({
+    store,
+    setStore,
+    setIsDirty,
+    setIncorrectCellIds,
+    setIsSolutionCorrect,
+    activeEntry,
+    acrossEntries,
+    downEntries,
+    displayedAcrossEntries,
+    displayedDownEntries,
+    displayedExtraEntries,
+    singleClueEntries,
+    currentFormStyle,
+  });
 
   // Solve mode gets its own full-width two-panel layout
   if (isSolve) {
@@ -2024,8 +2093,14 @@ export default function App() {
             name: shapeDesignerState.name,
             size: shapeDesignerState.size,
             layout: {
-              width: shapeDesignerState.designType === "composite" ? shapeDesignerState.componentGrid.width : shapeDesignerState.layout.width,
-              height: shapeDesignerState.designType === "composite" ? shapeDesignerState.componentGrid.height : shapeDesignerState.layout.height,
+              width:
+                shapeDesignerState.designType === "composite"
+                  ? shapeDesignerState.componentGrid.width
+                  : shapeDesignerState.layout.width,
+              height:
+                shapeDesignerState.designType === "composite"
+                  ? shapeDesignerState.componentGrid.height
+                  : shapeDesignerState.layout.height,
               overlapRows: shapeDesignerState.layout.overlapRows,
               overlapCols: shapeDesignerState.layout.overlapCols,
             },
@@ -2185,8 +2260,12 @@ export default function App() {
           onClueChange={handleClueChange}
           onConstruct={handleUseDesignedShape}
           onStartFromShape={() => setShapeLibraryDialogMode("startPrimitive")}
-          onInsertPrimitiveShape={() => setShapeLibraryDialogMode("insertPrimitive")}
-          onStartFromCompositeShape={() => setShapeLibraryDialogMode("startComposite")}
+          onInsertPrimitiveShape={() =>
+            setShapeLibraryDialogMode("insertPrimitive")
+          }
+          onStartFromCompositeShape={() =>
+            setShapeLibraryDialogMode("startComposite")
+          }
           onSaveShape={handleSaveDesignedShape}
           onClearDesignedGrid={handleClearDesignedGrid}
           onLoadDesignedShape={handleLoadDesignedShape}
